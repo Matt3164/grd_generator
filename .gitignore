@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.venv*/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Exports de debug et données intermédiaires
+debug_export/
+
+# Données (jamais versionnées : volumineuses)
+data/processed/*
+!data/processed/.gitkeep
+
+# Outils
+.idea/
+.vscode/
