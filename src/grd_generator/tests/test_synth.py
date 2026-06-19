@@ -6,11 +6,13 @@ from grd_generator.synth import (
     airy_field,
     available_modes,
     check_power_conservation,
+    directivity_dbi_from_field,
     field_generator,
     gaussian_field,
     hex_centers_uv,
     max_peak_dbi,
     optimize_sigma,
+    power_fraction,
 )
 
 
@@ -86,3 +88,23 @@ def test_optimize_sigma_infeasible_raises() -> None:
             grid, centers, peak_gain_dbi=-50.0,  # far too weak to ever reach target
             zone_center=(0.0, 0.0), zone_radius=6.0, target_dbi=44.0, sigma_hi=5.0,
         )
+
+
+def test_power_fraction_returns_float() -> None:
+    """Couvre power_fraction : fraction de puissance rayonnée capturée par la grille."""
+    grid = _grid()
+    spec = GaussianSpec(center_uv=(0.0, 0.0), sigma=1.0, peak_gain_dbi=40.0)
+    field = gaussian_field(spec, grid)
+    frac = power_fraction(field, grid)
+    assert isinstance(frac, float)
+    assert 0.0 < frac <= 1.0
+
+
+def test_directivity_dbi_from_field_values() -> None:
+    """Couvre directivity_dbi_from_field : vérifie la conversion |E|² → dBi."""
+    grid = _grid()
+    spec = GaussianSpec(center_uv=(0.0, 0.0), sigma=1.0, peak_gain_dbi=40.0)
+    field = gaussian_field(spec, grid)
+    dbi_map = directivity_dbi_from_field(field)
+    # La crête doit être proche de peak_gain_dbi au carré (puissance = 40 dBi).
+    assert float(dbi_map.max()) == pytest.approx(40.0, abs=0.1)
