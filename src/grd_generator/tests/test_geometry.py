@@ -46,3 +46,4 @@ def test_raytrace_miss_off_disk() -> None:
     )
     assert not bool(hit[0])
     assert np.isnan(lat[0])
+    assert np.isnan(lon[0])

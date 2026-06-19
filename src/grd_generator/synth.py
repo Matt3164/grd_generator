@@ -5,7 +5,7 @@ Deux **modes de génération** enfichables (registre `_MODES`, défaut `gaussian
 `gaussian` (lisse, sans lobes) et `airy` (ouverture circulaire uniforme, lobes à
 −17,6 dB et nulls francs — cf. `docs/biblio-patterns.md`). Ce module est
 entièrement testé (100 %) ; le script d'écriture du .npz vit dans
-`generation/generate_reference.py` (exclu de couverture).
+`generate.py` (exclu de couverture).
 """
 
 from collections.abc import Callable
@@ -210,7 +210,7 @@ def combined_max_directivity_dbi(fields: list[ComplexField]) -> DirectivityMap:
     norme L2 unité) sur un point, la directivité atteignable y vaut
     `10·log10(Σ|Eᵢ|²)` — borne de Cauchy-Schwarz `|Σ wᵢ Eᵢ| ≤ ‖w‖·‖E‖`. C'est
     le RSS des champs : ≥ le meilleur élément seul, et exactement la crête du
-    faisceau formé (`service.formed_directivity`) lorsqu'on y pointe.
+    faisceau cohérent (combinaison en filtre adapté, lobe pointé) lorsqu'on y pointe.
     """
     power = np.sum([np.abs(f) ** 2 for f in fields], axis=0)
     dbi: DirectivityMap = (10.0 * np.log10(np.maximum(power, _FLOOR))).astype(np.float64)

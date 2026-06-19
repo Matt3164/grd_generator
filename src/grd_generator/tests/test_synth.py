@@ -53,7 +53,7 @@ def test_max_peak_dbi_known_modes() -> None:
         max_peak_dbi("nope", 1.0)
 
 
-def test_check_power_conservation_warns_over_bound(caplog: pytest.LogCaptureFixture) -> None:
+def test_check_power_conservation_warns_over_bound() -> None:
     # A huge peak for a wide lobe exceeds the physical bound → returns False.
     # max_peak_dbi("gaussian", 5.0) ≈ 27.2 dBi, so 99.0 is well above → False
     assert check_power_conservation("gaussian", sigma=5.0, peak_gain_dbi=99.0) is False
