@@ -10,6 +10,11 @@ dependencies = [
     "loguru>=0.7",
 ]
 
+[project.optional-dependencies]
+viz = [
+    "matplotlib>=3.9",  # rendu des diagrammes (script plot.py, extra optionnel)
+]
+
 [dependency-groups]
 dev = [
     "pytest>=8.2",
@@ -20,6 +25,7 @@ dev = [
 
 [project.scripts]
 grd-generate = "grd_generator.generate:main"
+grd-plot = "grd_generator.plot:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -40,6 +46,12 @@ python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
 
+# matplotlib (extra viz) n'a pas de stubs : le rendu (plot.py, hors couverture)
+# est vérifié au mieux sans typage de la lib graphique.
+[[tool.mypy.overrides]]
+module = ["matplotlib.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["src"]
@@ -50,6 +62,7 @@ source = ["src/grd_generator"]
 branch = true
 omit = [
     "*/grd_generator/generate.py",       # script offline : orchestration + écriture .npz
+    "*/grd_generator/plot.py",           # rendu matplotlib : effets de bord graphiques
     "*/grd_generator/examples/*",        # scripts d'exemple : testés en lancement
     "*/tests/*",
 ]
