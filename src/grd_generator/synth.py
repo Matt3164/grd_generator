@@ -17,6 +17,7 @@ from grd_generator.logger import logger
 from grd_generator.schemas import (
     ComplexField,
     DirectivityMap,
+    EllipticalSpec,
     GaussianSpec,
     UVGrid,
 )
@@ -113,6 +114,58 @@ _MODES: dict[str, FieldGenerator] = {
     "gaussian": gaussian_field,
     "airy": airy_field,
 }
+
+HALF_POWER_WIDTH_PER_SIGMA: float = 2.0 * float(np.sqrt(np.log(2.0)))
+
+
+def widths_to_sigmas(
+    mode: str,
+    width_major: float,
+    width_minor: float,
+    first_null: float | None = None,
+) -> tuple[float, float]:
+    """Convertit des largeurs de lobe (deg) en (σ_major, σ_minor) selon le mode.
+
+    `gaussian` : σ = largeur / (2·√ln2) (même convention que grd_analyzer).
+    `airy` (avec `first_null`) : on préserve l'ellipticité autour du premier null —
+    moyenne géométrique des σ = `first_null`, rapport = √(width_major/width_minor).
+    `airy` sans `first_null` : repli sur la conversion gaussian.
+    """
+    if mode not in ("gaussian", "airy"):
+        raise ValueError(f"mode inconnu : {mode!r} (connus : 'gaussian', 'airy')")
+    if mode == "airy" and first_null is not None:
+        root = float((width_major / width_minor) ** 0.25)
+        return first_null * root, first_null / root
+    return width_major / HALF_POWER_WIDTH_PER_SIGMA, width_minor / HALF_POWER_WIDTH_PER_SIGMA
+
+
+def elliptical_field(spec: EllipticalSpec, grid: UVGrid, *, mode: str = "gaussian") -> ComplexField:
+    """Champ complexe d'un élément à lobe elliptique (axes propres tournés).
+
+    Réduction exacte au générateur circulaire correspondant quand
+    `sigma_major == sigma_minor`. Phase radiale `phase_slope_radial·‖uv−c‖`.
+    """
+    gu, gv = grid.meshgrid()
+    cu, cv = spec.center_uv
+    du = gu - cu
+    dv = gv - cv
+    theta = np.radians(spec.orientation_deg)
+    cos_t, sin_t = np.cos(theta), np.sin(theta)
+    du_p = du * cos_t + dv * sin_t
+    dv_p = -du * sin_t + dv * cos_t
+    rho = np.sqrt((du_p / spec.sigma_major) ** 2 + (dv_p / spec.sigma_minor) ** 2)
+    peak_lin = 10.0 ** (spec.peak_gain_dbi / 20.0)
+    if mode == "gaussian":
+        amplitude = peak_lin * np.exp(-0.5 * rho**2)
+    elif mode == "airy":
+        x = _J1_FIRST_NULL * rho
+        jinc = np.where(x == 0.0, 1.0, 2.0 * _bessel_j1(x) / np.where(x == 0.0, 1.0, x))
+        amplitude = peak_lin * jinc
+    else:
+        raise ValueError(f"mode de génération inconnu : {mode!r} (connus : {available_modes()})")
+    phase = spec.phase_slope_radial * np.sqrt(du**2 + dv**2)
+    field: ComplexField = (amplitude * np.exp(1j * phase)).astype(np.complex128)
+    return field
 
 _DEG_TO_RAD = np.pi / 180.0
 
@@ -354,4 +407,7 @@ __all__ = [
     "envelope_min_dbi",
     "hex_centers_uv",
     "optimize_sigma",
+    "HALF_POWER_WIDTH_PER_SIGMA",
+    "widths_to_sigmas",
+    "elliptical_field",
 ]
