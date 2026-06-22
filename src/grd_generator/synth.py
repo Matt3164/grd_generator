@@ -134,7 +134,7 @@ def widths_to_sigmas(
     if mode not in ("gaussian", "airy"):
         raise ValueError(f"mode inconnu : {mode!r} (connus : 'gaussian', 'airy')")
     if mode == "airy" and first_null is not None:
-        root = float((width_major / width_minor) ** 0.25)
+        root = float(np.sqrt(width_major / width_minor))
         return first_null * root, first_null / root
     return width_major / HALF_POWER_WIDTH_PER_SIGMA, width_minor / HALF_POWER_WIDTH_PER_SIGMA
 

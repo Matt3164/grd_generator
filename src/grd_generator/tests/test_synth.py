@@ -120,11 +120,10 @@ def test_half_power_constant_matches_analyzer() -> None:
 
     from grd_generator.synth import HALF_POWER_WIDTH_PER_SIGMA
 
-    assert HALF_POWER_WIDTH_PER_SIGMA == pytest.approx(2.0 * np.sqrt(np.log(2.0)))
+    assert pytest.approx(2.0 * np.sqrt(np.log(2.0))) == HALF_POWER_WIDTH_PER_SIGMA
 
 
 def test_widths_to_sigmas_gaussian() -> None:
-    import numpy as np
 
     from grd_generator.synth import HALF_POWER_WIDTH_PER_SIGMA, widths_to_sigmas
 
@@ -139,9 +138,9 @@ def test_widths_to_sigmas_airy_preserves_ellipticity() -> None:
     from grd_generator.synth import widths_to_sigmas
 
     smaj, smin = widths_to_sigmas("airy", 0.30, 0.15, first_null=0.03)
-    # geometric mean preserved at first_null; ratio == sqrt(width ratio)
+    # geometric mean preserved at first_null; sigma ellipticity == width ellipticity
     assert np.sqrt(smaj * smin) == pytest.approx(0.03)
-    assert smaj / smin == pytest.approx(np.sqrt(0.30 / 0.15))
+    assert smaj / smin == pytest.approx(0.30 / 0.15)
 
 
 def test_widths_to_sigmas_airy_without_null_falls_back_to_gaussian() -> None:
@@ -159,7 +158,7 @@ def test_widths_to_sigmas_unknown_mode_raises() -> None:
         widths_to_sigmas("nope", 0.3, 0.15)
 
 
-def _ellip_grid():
+def _ellip_grid() -> "UVGrid":
     from grd_generator.schemas import UVGrid
 
     return UVGrid(u_min=-1.0, u_max=1.0, v_min=-1.0, v_max=1.0, n_u=101, n_v=101)
@@ -171,7 +170,9 @@ def test_elliptical_peak_at_center() -> None:
     from grd_generator.schemas import EllipticalSpec
     from grd_generator.synth import elliptical_field
 
-    spec = EllipticalSpec(center_uv=(0.0, 0.0), sigma_major=0.4, sigma_minor=0.2, peak_gain_dbi=40.0)
+    spec = EllipticalSpec(
+        center_uv=(0.0, 0.0), sigma_major=0.4, sigma_minor=0.2, peak_gain_dbi=40.0
+    )
     field = elliptical_field(spec, _ellip_grid())
     assert np.abs(field).max() == pytest.approx(10.0 ** (40.0 / 20.0), rel=1e-3)
 
@@ -185,7 +186,9 @@ def test_elliptical_circular_reduces_to_gaussian() -> None:
     grid = _ellip_grid()
     ell = EllipticalSpec(center_uv=(0.1, -0.1), sigma_major=0.3, sigma_minor=0.3,
                          peak_gain_dbi=35.0, phase_slope_radial=2.0)
-    circ = GaussianSpec(center_uv=(0.1, -0.1), sigma=0.3, peak_gain_dbi=35.0, phase_slope_radial=2.0)
+    circ = GaussianSpec(
+        center_uv=(0.1, -0.1), sigma=0.3, peak_gain_dbi=35.0, phase_slope_radial=2.0
+    )
     np.testing.assert_allclose(elliptical_field(ell, grid), gaussian_field(circ, grid), rtol=1e-9)
 
 
@@ -215,7 +218,9 @@ def test_elliptical_airy_has_nulls() -> None:
     from grd_generator.schemas import EllipticalSpec
     from grd_generator.synth import elliptical_field
 
-    spec = EllipticalSpec(center_uv=(0.0, 0.0), sigma_major=0.3, sigma_minor=0.2, peak_gain_dbi=30.0)
+    spec = EllipticalSpec(
+        center_uv=(0.0, 0.0), sigma_major=0.3, sigma_minor=0.2, peak_gain_dbi=30.0
+    )
     amp = np.abs(elliptical_field(spec, _ellip_grid(), mode="airy"))
     assert amp.min() < amp.max() * 0.05  # deep nulls present
 
@@ -226,6 +231,8 @@ def test_elliptical_unknown_mode_raises() -> None:
     from grd_generator.schemas import EllipticalSpec
     from grd_generator.synth import elliptical_field
 
-    spec = EllipticalSpec(center_uv=(0.0, 0.0), sigma_major=0.3, sigma_minor=0.2, peak_gain_dbi=30.0)
+    spec = EllipticalSpec(
+        center_uv=(0.0, 0.0), sigma_major=0.3, sigma_minor=0.2, peak_gain_dbi=30.0
+    )
     with _pytest.raises(ValueError):
         elliptical_field(spec, _ellip_grid(), mode="nope")
