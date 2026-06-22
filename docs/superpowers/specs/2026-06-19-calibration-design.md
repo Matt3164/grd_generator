@@ -203,3 +203,32 @@ testables — `EllipticalSpec`, `elliptical_field`, `widths_to_sigmas`,
 Inchangées : `numpy`, `pydantic`, `loguru`. Pas de nouvelle dépendance.
 ```
 </content>
+
+---
+
+## Amendement (2026-06-22) — maillage piloté par la zone
+
+Retour utilisateur : **le maillage ne vient pas du rapport**, il est dicté par la
+**zone de couverture** (entrée de génération, ex. FRANCE), et doit être adapté
+pour couvrir au mieux la zone. Le rapport ne fournit que le **caractère d'élément**.
+
+Modèle révisé de `calibrate` :
+
+- **Géométrie ← zone** : `sat_frame_geometry(scenario)` → centre/rayon de zone +
+  grille ; espacement par `auto_spacing(rayon, n_elements)` (resserré jusqu'à loger
+  `n_elements` dans le disque) ; maille hexagonale `hex_centers_uv` sur la zone.
+  `n_elements` est un paramètre (défaut 80), plus `stats.n_elements`.
+- **Échelle σ ← couverture** : bissection sur l'échelle σ (moyenne géométrique du
+  lobe) jusqu'à ce que l'enveloppe **max sur patterns** (`pattern_envelope_min_in_zone`,
+  `synth`) ≥ `crête_moyenne − coverage_margin_db` (défaut −3 dB) dans la zone. Si
+  infaisable à σ_hi=5°, on plafonne avec un warning (cas des éléments `airy`, dont
+  les nulls empêchent une couverture contiguë à −3 dB).
+- **Caractère ← rapport** (échantillonné par élément, seed fixe) : mode, **ratio
+  d'ellipticité** (constant = rapport des largeurs moyennes), orientation, crête,
+  pente de phase, et une dispersion de **taille** relative. Le `spacing_deg` du
+  rapport n'est plus utilisé.
+- **`validate_against`** : diagnostique crête, phase, ellipticité (le σ/espacement
+  ne sont plus comparés au rapport — ils viennent de la zone).
+
+Nouveaux helpers `synth` (couverts) : `pattern_max_envelope_dbi` (max sur patterns)
+et `pattern_envelope_min_in_zone` (min de cette enveloppe dans la zone).
