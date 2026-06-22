@@ -1,0 +1,1676 @@
+{
+  "n_elements": 82,
+  "elements": [
+    {
+      "element_id": "feed_TX_001",
+      "peak_dbi": 28.20979900705091,
+      "center_uv": [
+        0.008555009835294142,
+        -0.01222144255137253
+      ],
+      "lobe_width_deg": 0.07332865548235257,
+      "first_sidelobe_db": -2.33081811320147,
+      "phase_span_rad": 6.279226690581555,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2501118289269974,
+      "lobe_width_minor_deg": 0.12463283882894839,
+      "lobe_orientation_deg": -39.82329806932543,
+      "ellipticity": 2.006789151856373,
+      "phase_slope_est_rad_per_deg": 97.90210989253046,
+      "phase_residual_rms_rad": 1.682499776681292,
+      "first_null_radius_deg": 0.02199859664470577,
+      "cross_pol_max_db": -23.362056816758155
+    },
+    {
+      "element_id": "feed_TX_002",
+      "peak_dbi": 28.358559045673466,
+      "center_uv": [
+        -0.02322074087372547,
+        0.024442885189803948
+      ],
+      "lobe_width_deg": 0.04033076051529391,
+      "first_sidelobe_db": -1.5953606601919315,
+      "phase_span_rad": 6.280173262795655,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24874897369961269,
+      "lobe_width_minor_deg": 0.1264663894604984,
+      "lobe_orientation_deg": -48.3656531274481,
+      "ellipticity": 1.9669176510910757,
+      "phase_slope_est_rad_per_deg": 124.26037024821198,
+      "phase_residual_rms_rad": 1.685360069456824,
+      "first_null_radius_deg": 0.05071898670862719,
+      "cross_pol_max_db": -23.932852141971654
+    },
+    {
+      "element_id": "feed_TX_003",
+      "peak_dbi": 28.51016525471669,
+      "center_uv": [
+        -0.01222144255137253,
+        0.01344358686745098
+      ],
+      "lobe_width_deg": 0.04033076051529391,
+      "first_sidelobe_db": -1.2643468625104348,
+      "phase_span_rad": 6.280110094619317,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24430066420483817,
+      "lobe_width_minor_deg": 0.12118312064165732,
+      "lobe_orientation_deg": -57.070034379225135,
+      "ellipticity": 2.015962808279576,
+      "phase_slope_est_rad_per_deg": 121.75005973814723,
+      "phase_residual_rms_rad": 1.6874704977427841,
+      "first_null_radius_deg": 0.03788647199921549,
+      "cross_pol_max_db": -24.300161838248286
+    },
+    {
+      "element_id": "feed_TX_004",
+      "peak_dbi": 28.104524305231028,
+      "center_uv": [
+        -0.0048885770031372455,
+        -0.017110019583529396
+      ],
+      "lobe_width_deg": 0.07271758335333296,
+      "first_sidelobe_db": -2.4771414893072947,
+      "phase_span_rad": 6.280592598218864,
+      "truncated": false,
+      "lobe_width_major_deg": 0.25363890943355044,
+      "lobe_width_minor_deg": 0.13518937859275654,
+      "lobe_orientation_deg": -34.82236218903785,
+      "ellipticity": 1.8761748302550483,
+      "phase_slope_est_rad_per_deg": 101.66757565762782,
+      "phase_residual_rms_rad": 1.6819860796907804,
+      "first_null_radius_deg": 0.02199859664470577,
+      "cross_pol_max_db": -23.17958005136539
+    },
+    {
+      "element_id": "feed_TX_005",
+      "peak_dbi": 27.991164333344635,
+      "center_uv": [
+        -0.025665029389803917,
+        -0.009777154035294111
+      ],
+      "lobe_width_deg": 0.04094183264431352,
+      "first_sidelobe_db": null,
+      "phase_span_rad": 6.279911617900643,
+      "truncated": false,
+      "lobe_width_major_deg": 0.25833618463358077,
+      "lobe_width_minor_deg": 0.14915422362248554,
+      "lobe_orientation_deg": -46.353532232942314,
+      "ellipticity": 1.7320071692199512,
+      "phase_slope_est_rad_per_deg": 110.45366244285515,
+      "phase_residual_rms_rad": 1.6912809987556567,
+      "first_null_radius_deg": null,
+      "cross_pol_max_db": -23.267021136233296
+    },
+    {
+      "element_id": "feed_TX_006",
+      "peak_dbi": 28.03890222547274,
+      "center_uv": [
+        -0.028109317905882336,
+        0.008555009835294142
+      ],
+      "lobe_width_deg": 0.04155290477333312,
+      "first_sidelobe_db": -1.0154821936615368,
+      "phase_span_rad": 6.279952438381274,
+      "truncated": false,
+      "lobe_width_major_deg": 0.25466605147945826,
+      "lobe_width_minor_deg": 0.14817568993642866,
+      "lobe_orientation_deg": -52.48470110988805,
+      "ellipticity": 1.7186763334033863,
+      "phase_slope_est_rad_per_deg": 123.00521499317938,
+      "phase_residual_rms_rad": 1.6859052984640017,
+      "first_null_radius_deg": 0.036664327741176284,
+      "cross_pol_max_db": -23.800905962427237
+    },
+    {
+      "element_id": "feed_TX_007",
+      "peak_dbi": 28.183469775023507,
+      "center_uv": [
+        -0.017110019583529396,
+        -0.002444288487058799
+      ],
+      "lobe_width_deg": 0.04155290477333312,
+      "first_sidelobe_db": -0.7445488243408137,
+      "phase_span_rad": 6.2803118507178795,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2502895246320748,
+      "lobe_width_minor_deg": 0.14261002700594153,
+      "lobe_orientation_deg": -59.84333352663673,
+      "ellipticity": 1.755062598940866,
+      "phase_slope_est_rad_per_deg": 120.49490448311462,
+      "phase_residual_rms_rad": 1.6790849806352153,
+      "first_null_radius_deg": 0.035442183483137074,
+      "cross_pol_max_db": -24.15912700450518
+    },
+    {
+      "element_id": "feed_TX_008",
+      "peak_dbi": 28.216587527267688,
+      "center_uv": [
+        -0.02199859661568626,
+        0.018332163899607845
+      ],
+      "lobe_width_deg": 0.056218635869803635,
+      "first_sidelobe_db": -3.6227252197012527,
+      "phase_span_rad": 6.280541073397556,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2461851183997128,
+      "lobe_width_minor_deg": 0.13031040178983427,
+      "lobe_orientation_deg": -70.57102880189439,
+      "ellipticity": 1.8892207760725215,
+      "phase_slope_est_rad_per_deg": 95.3917993824657,
+      "phase_residual_rms_rad": 1.6811392050249374,
+      "first_null_radius_deg": 0.02322074090274498,
+      "cross_pol_max_db": -24.021573658031162
+    },
+    {
+      "element_id": "feed_TX_009",
+      "peak_dbi": 28.380503740161668,
+      "center_uv": [
+        -0.009777154035294111,
+        0.006110721319215695
+      ],
+      "lobe_width_deg": 0.05560756374078403,
+      "first_sidelobe_db": -3.456368797130325,
+      "phase_span_rad": 6.280364987873775,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2292923174350926,
+      "lobe_width_minor_deg": 0.09308864707477839,
+      "lobe_orientation_deg": -88.03031451982214,
+      "ellipticity": 2.463160918547902,
+      "phase_slope_est_rad_per_deg": 52.71652071136259,
+      "phase_residual_rms_rad": 1.6680292425946974,
+      "first_null_radius_deg": 0.0256650294188234,
+      "cross_pol_max_db": -24.37512131231415
+    },
+    {
+      "element_id": "feed_TX_010",
+      "peak_dbi": 28.20987088993561,
+      "center_uv": [
+        0.03177575073803923,
+        -0.008555009777254902
+      ],
+      "lobe_width_deg": 0.07455079974039178,
+      "first_sidelobe_db": -1.6457911073870117,
+      "phase_span_rad": 6.280161333056584,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2338218558779261,
+      "lobe_width_minor_deg": 0.169905030355273,
+      "lobe_orientation_deg": 10.220412427204309,
+      "ellipticity": 1.3761914840837992,
+      "phase_slope_est_rad_per_deg": 46.440744436200475,
+      "phase_residual_rms_rad": 1.6386002367374655,
+      "first_null_radius_deg": 0.02322074090274498,
+      "cross_pol_max_db": -23.165354620872456
+    },
+    {
+      "element_id": "feed_TX_011",
+      "peak_dbi": 27.962902752005625,
+      "center_uv": [
+        -0.02199859661568626,
+        -0.02077645235764705
+      ],
+      "lobe_width_deg": 0.07271758335333296,
+      "first_sidelobe_db": -2.489592594385974,
+      "phase_span_rad": 6.280542625648605,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24311780887597684,
+      "lobe_width_minor_deg": 0.21141979115587559,
+      "lobe_orientation_deg": -20.52383371880734,
+      "ellipticity": 1.1499292830950294,
+      "phase_slope_est_rad_per_deg": 105.43304142272518,
+      "phase_residual_rms_rad": 1.683885934985221,
+      "first_null_radius_deg": 0.02199859664470577,
+      "cross_pol_max_db": -22.99434355370137
+    },
+    {
+      "element_id": "feed_TX_012",
+      "peak_dbi": 27.810441944589968,
+      "center_uv": [
+        -0.009777154035294111,
+        -0.0329978949380392
+      ],
+      "lobe_width_deg": 0.07210651122431336,
+      "first_sidelobe_db": -2.0711869416046245,
+      "phase_span_rad": 6.280405690771911,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2452036471226678,
+      "lobe_width_minor_deg": 0.2194547019722316,
+      "lobe_orientation_deg": -38.73928886194108,
+      "ellipticity": 1.1173314807977743,
+      "phase_slope_est_rad_per_deg": 107.94335193279039,
+      "phase_residual_rms_rad": 1.6867696086548623,
+      "first_null_radius_deg": 0.02199859664470577,
+      "cross_pol_max_db": -23.004330223986905
+    },
+    {
+      "element_id": "feed_TX_013",
+      "peak_dbi": 27.807564691715108,
+      "center_uv": [
+        -0.03177575067999999,
+        -0.024442885131764708
+      ],
+      "lobe_width_deg": 0.03971968838627431,
+      "first_sidelobe_db": -1.4222338516799442,
+      "phase_span_rad": 6.280069772425591,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24272713772491852,
+      "lobe_width_minor_deg": 0.21840694577088116,
+      "lobe_orientation_deg": -50.605085735680916,
+      "ellipticity": 1.1113526489196472,
+      "phase_slope_est_rad_per_deg": 111.7088176978873,
+      "phase_residual_rms_rad": 1.6965432566907326,
+      "first_null_radius_deg": 0.04888577032156838,
+      "cross_pol_max_db": -23.53564775740204
+    },
+    {
+      "element_id": "feed_TX_014",
+      "peak_dbi": 27.83657771258255,
+      "center_uv": [
+        -0.02077645235764705,
+        -0.035442183454117634
+      ],
+      "lobe_width_deg": 0.04033076051529391,
+      "first_sidelobe_db": null,
+      "phase_span_rad": 6.2800791908423195,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24422168180887724,
+      "lobe_width_minor_deg": 0.20952243239963822,
+      "lobe_orientation_deg": -65.93297881361843,
+      "ellipticity": 1.165611142500744,
+      "phase_slope_est_rad_per_deg": 111.7088176978873,
+      "phase_residual_rms_rad": 1.6931831492565943,
+      "first_null_radius_deg": null,
+      "cross_pol_max_db": -23.808563578871144
+    },
+    {
+      "element_id": "feed_TX_015",
+      "peak_dbi": 27.91317718531323,
+      "center_uv": [
+        -0.029331462163921546,
+        -0.018332163841568605
+      ],
+      "lobe_width_deg": 0.07332865548235257,
+      "first_sidelobe_db": null,
+      "phase_span_rad": 6.280092913920216,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24801952320857473,
+      "lobe_width_minor_deg": 0.19831131681156489,
+      "lobe_orientation_deg": -77.00337350532023,
+      "ellipticity": 1.2506574369845092,
+      "phase_slope_est_rad_per_deg": 105.43304142272518,
+      "phase_residual_rms_rad": 1.6774519262211582,
+      "first_null_radius_deg": null,
+      "cross_pol_max_db": -23.662083498986746
+    },
+    {
+      "element_id": "feed_TX_016",
+      "peak_dbi": 28.145022622862893,
+      "center_uv": [
+        -0.026887173647843127,
+        0.0012221442870588295
+      ],
+      "lobe_width_deg": 0.05560756374078403,
+      "first_sidelobe_db": -3.6195817016218115,
+      "phase_span_rad": 6.279593537671977,
+      "truncated": false,
+      "lobe_width_major_deg": 0.23414537065471397,
+      "lobe_width_minor_deg": 0.09963525398142219,
+      "lobe_orientation_deg": -89.58155549834129,
+      "ellipticity": 2.3500253303752534,
+      "phase_slope_est_rad_per_deg": 96.64695463749831,
+      "phase_residual_rms_rad": 1.6780996823323824,
+      "first_null_radius_deg": 0.02322074090274498,
+      "cross_pol_max_db": -24.060511497573497
+    },
+    {
+      "element_id": "feed_TX_017",
+      "peak_dbi": 28.333380847030597,
+      "center_uv": [
+        -0.014665731067450977,
+        -0.01222144255137253
+      ],
+      "lobe_width_deg": 0.05560756374078403,
+      "first_sidelobe_db": -3.524510849715292,
+      "phase_span_rad": 6.280129207352024,
+      "truncated": false,
+      "lobe_width_major_deg": 0.23031244869267756,
+      "lobe_width_minor_deg": 0.09435644740085607,
+      "lobe_orientation_deg": 86.36696775049205,
+      "ellipticity": 2.440876644223763,
+      "phase_slope_est_rad_per_deg": 91.62633361736835,
+      "phase_residual_rms_rad": 1.6905692897527356,
+      "first_null_radius_deg": 0.0256650294188234,
+      "cross_pol_max_db": -24.244242065590687
+    },
+    {
+      "element_id": "feed_TX_018",
+      "peak_dbi": 28.29751762626036,
+      "center_uv": [
+        0.017110019641568636,
+        -0.01222144255137253
+      ],
+      "lobe_width_deg": 0.07271758335333296,
+      "first_sidelobe_db": -1.6488638213786289,
+      "phase_span_rad": 6.280075765389931,
+      "truncated": false,
+      "lobe_width_major_deg": 0.23534864332477376,
+      "lobe_width_minor_deg": 0.16539284028544915,
+      "lobe_orientation_deg": 29.268283828814162,
+      "ellipticity": 1.4229675415126126,
+      "phase_slope_est_rad_per_deg": 94.1366441274331,
+      "phase_residual_rms_rad": 1.677943466276675,
+      "first_null_radius_deg": 0.02444288516078419,
+      "cross_pol_max_db": -23.282675785566337
+    },
+    {
+      "element_id": "feed_TX_019",
+      "peak_dbi": 27.981194794443315,
+      "center_uv": [
+        0.026887173705882367,
+        -0.024442885131764708
+      ],
+      "lobe_width_deg": 0.07393972761137217,
+      "first_sidelobe_db": -1.4858594811504933,
+      "phase_span_rad": 6.279786422371357,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24069310790161708,
+      "lobe_width_minor_deg": 0.21334724636214664,
+      "lobe_orientation_deg": 4.365138786298047,
+      "ellipticity": 1.1281753667120322,
+      "phase_slope_est_rad_per_deg": 100.41242040259567,
+      "phase_residual_rms_rad": 1.6815724785091408,
+      "first_null_radius_deg": 0.02444288516078419,
+      "cross_pol_max_db": -22.987118718992168
+    },
+    {
+      "element_id": "feed_TX_020",
+      "peak_dbi": 27.665762993303552,
+      "center_uv": [
+        -0.026887173647843127,
+        -0.03666432771215686
+      ],
+      "lobe_width_deg": 0.07271758335333296,
+      "first_sidelobe_db": -2.0921967730456505,
+      "phase_span_rad": 6.279763402526757,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2447703384276005,
+      "lobe_width_minor_deg": 0.22725526018442377,
+      "lobe_orientation_deg": -26.834607006757636,
+      "ellipticity": 1.0770722676736404,
+      "phase_slope_est_rad_per_deg": 109.19850718782254,
+      "phase_residual_rms_rad": 1.6933058305487614,
+      "first_null_radius_deg": 0.02199859664470577,
+      "cross_pol_max_db": -22.790935965651716
+    },
+    {
+      "element_id": "feed_TX_021",
+      "peak_dbi": 27.517975911003013,
+      "center_uv": [
+        -0.04888577029254901,
+        -0.026887173647843127
+      ],
+      "lobe_width_deg": 0.04094183264431352,
+      "first_sidelobe_db": null,
+      "phase_span_rad": 6.2804517794877714,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24487135127552762,
+      "lobe_width_minor_deg": 0.23133351068203212,
+      "lobe_orientation_deg": -44.916277185716325,
+      "ellipticity": 1.058520879891471,
+      "phase_slope_est_rad_per_deg": 115.47428346298466,
+      "phase_residual_rms_rad": 1.698443835183382,
+      "first_null_radius_deg": null,
+      "cross_pol_max_db": -22.854309706450145
+    },
+    {
+      "element_id": "feed_TX_022",
+      "peak_dbi": 27.595474911942915,
+      "center_uv": [
+        -0.03788647197019607,
+        -0.03788647197019607
+      ],
+      "lobe_width_deg": 0.03971968838627431,
+      "first_sidelobe_db": null,
+      "phase_span_rad": 6.279910944395969,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24064442589841023,
+      "lobe_width_minor_deg": 0.22850331342639527,
+      "lobe_orientation_deg": -60.702120676713676,
+      "ellipticity": 1.0531332009587064,
+      "phase_slope_est_rad_per_deg": 115.47428346298466,
+      "phase_residual_rms_rad": 1.6972180750107537,
+      "first_null_radius_deg": null,
+      "cross_pol_max_db": -23.533485617698886
+    },
+    {
+      "element_id": "feed_TX_023",
+      "peak_dbi": 27.63739517207437,
+      "center_uv": [
+        -0.045219337518431366,
+        -0.02199859661568626
+      ],
+      "lobe_width_deg": 0.07210651122431336,
+      "first_sidelobe_db": null,
+      "phase_span_rad": 6.280119663034714,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24095265703549515,
+      "lobe_width_minor_deg": 0.22618086125010478,
+      "lobe_orientation_deg": -80.10339309436974,
+      "ellipticity": 1.065309662823576,
+      "phase_slope_est_rad_per_deg": 109.19850718782254,
+      "phase_residual_rms_rad": 1.6831454673252033,
+      "first_null_radius_deg": null,
+      "cross_pol_max_db": -23.759251748075577
+    },
+    {
+      "element_id": "feed_TX_024",
+      "peak_dbi": 27.789570833165765,
+      "center_uv": [
+        -0.0329978949380392,
+        0.029331462221960786
+      ],
+      "lobe_width_deg": 0.07393972761137217,
+      "first_sidelobe_db": null,
+      "phase_span_rad": 6.279501046520066,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24932385060945983,
+      "lobe_width_minor_deg": 0.20964952190880692,
+      "lobe_orientation_deg": 87.8345404422138,
+      "ellipticity": 1.1892412076089083,
+      "phase_slope_est_rad_per_deg": 106.68819667775779,
+      "phase_residual_rms_rad": 1.6771748314110666,
+      "first_null_radius_deg": null,
+      "cross_pol_max_db": -23.594573714604124
+    },
+    {
+      "element_id": "feed_TX_025",
+      "peak_dbi": 28.055509707855528,
+      "center_uv": [
+        -0.030553606421960783,
+        -0.014665731067450977
+      ],
+      "lobe_width_deg": 0.05682970799882324,
+      "first_sidelobe_db": -3.73496370921234,
+      "phase_span_rad": 6.280541741466475,
+      "truncated": false,
+      "lobe_width_major_deg": 0.25096432984387745,
+      "lobe_width_minor_deg": 0.14545035370126205,
+      "lobe_orientation_deg": 66.25343129716462,
+      "ellipticity": 1.725429491627973,
+      "phase_slope_est_rad_per_deg": 97.90210989253046,
+      "phase_residual_rms_rad": 1.6768237665532948,
+      "first_null_radius_deg": 0.02322074090274498,
+      "cross_pol_max_db": -23.829764807011205
+    },
+    {
+      "element_id": "feed_TX_026",
+      "peak_dbi": 28.412178237639317,
+      "center_uv": [
+        -0.002444288487058799,
+        0.004888577061176486
+      ],
+      "lobe_width_deg": 0.04277504903137233,
+      "first_sidelobe_db": -0.7158893409706955,
+      "phase_span_rad": 6.280036804969082,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2424555952505434,
+      "lobe_width_minor_deg": 0.11998410785419518,
+      "lobe_orientation_deg": 69.2747090634426,
+      "ellipticity": 2.0207309083397584,
+      "phase_slope_est_rad_per_deg": 116.72943871801726,
+      "phase_residual_rms_rad": 1.6870054546385969,
+      "first_null_radius_deg": 0.035442183483137074,
+      "cross_pol_max_db": -24.163636575258174
+    },
+    {
+      "element_id": "feed_TX_027",
+      "peak_dbi": 27.997484707278378,
+      "center_uv": [
+        0.01222144260941177,
+        -0.024442885131764708
+      ],
+      "lobe_width_deg": 0.07638401612745059,
+      "first_sidelobe_db": -1.5454083890072634,
+      "phase_span_rad": 6.279673950951962,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2446362734148409,
+      "lobe_width_minor_deg": 0.17962528703755057,
+      "lobe_orientation_deg": 30.158354182033918,
+      "ellipticity": 1.361925581021896,
+      "phase_slope_est_rad_per_deg": 148.1083200938283,
+      "phase_residual_rms_rad": 1.6910340851234604,
+      "first_null_radius_deg": 0.02199859664470577,
+      "cross_pol_max_db": -23.61057739605416
+    },
+    {
+      "element_id": "feed_TX_028",
+      "peak_dbi": 27.716015875042853,
+      "center_uv": [
+        0.020776452415686292,
+        -0.035442183454117634
+      ],
+      "lobe_width_deg": 0.0769950882564702,
+      "first_sidelobe_db": -1.1225518645951251,
+      "phase_span_rad": 6.279544482354116,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2424259611611859,
+      "lobe_width_minor_deg": 0.22716008568257606,
+      "lobe_orientation_deg": -10.28185885742559,
+      "ellipticity": 1.0672031595371985,
+      "phase_slope_est_rad_per_deg": 153.12894111395826,
+      "phase_residual_rms_rad": 1.6895844009436556,
+      "first_null_radius_deg": 0.02077645238666656,
+      "cross_pol_max_db": -23.341205876248054
+    },
+    {
+      "element_id": "feed_TX_029",
+      "peak_dbi": 27.462499655347784,
+      "center_uv": [
+        0.030553606480000023,
+        -0.046441481776470575
+      ],
+      "lobe_width_deg": 0.04094183264431352,
+      "first_sidelobe_db": -1.0220128979906538,
+      "phase_span_rad": 6.280483868204168,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2417780929939982,
+      "lobe_width_minor_deg": 0.23379171368534665,
+      "lobe_orientation_deg": -24.813337555034195,
+      "ellipticity": 1.034160232553837,
+      "phase_slope_est_rad_per_deg": 158.14956213408777,
+      "phase_residual_rms_rad": 1.688735090958023,
+      "first_null_radius_deg": 0.01955430812862735,
+      "cross_pol_max_db": -23.187441727585817
+    },
+    {
+      "element_id": "feed_TX_030",
+      "peak_dbi": 27.32357223094841,
+      "center_uv": [
+        -0.05377434732470587,
+        -0.04277504900235293
+      ],
+      "lobe_width_deg": 0.04033076051529391,
+      "first_sidelobe_db": null,
+      "phase_span_rad": 6.280425720227121,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24114940015418823,
+      "lobe_width_minor_deg": 0.23508881858679073,
+      "lobe_orientation_deg": -49.28204437799093,
+      "ellipticity": 1.0257799652226336,
+      "phase_slope_est_rad_per_deg": 116.72943871801726,
+      "phase_residual_rms_rad": 1.69654996306944,
+      "first_null_radius_deg": null,
+      "cross_pol_max_db": -23.235471131082463
+    },
+    {
+      "element_id": "feed_TX_031",
+      "peak_dbi": 27.32294258078646,
+      "center_uv": [
+        -0.04399719326039214,
+        -0.05255220306666665
+      ],
+      "lobe_width_deg": 0.03971968838627431,
+      "first_sidelobe_db": null,
+      "phase_span_rad": 6.280369846250927,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24162496603044428,
+      "lobe_width_minor_deg": 0.2319326217290703,
+      "lobe_orientation_deg": -84.77445982186916,
+      "ellipticity": 1.0417894827778733,
+      "phase_slope_est_rad_per_deg": 116.72943871801726,
+      "phase_residual_rms_rad": 1.7020599546723512,
+      "first_null_radius_deg": null,
+      "cross_pol_max_db": -23.431913112744752
+    },
+    {
+      "element_id": "feed_TX_032",
+      "peak_dbi": 27.556680247099237,
+      "center_uv": [
+        -0.04888577029254901,
+        0.024442885189803948
+      ],
+      "lobe_width_deg": 0.07271758335333296,
+      "first_sidelobe_db": null,
+      "phase_span_rad": 6.280094481982572,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24116883793763963,
+      "lobe_width_minor_deg": 0.22836687004721257,
+      "lobe_orientation_deg": 82.12842657521064,
+      "ellipticity": 1.0560587789629046,
+      "phase_slope_est_rad_per_deg": 110.45366244285515,
+      "phase_residual_rms_rad": 1.6845841977657607,
+      "first_null_radius_deg": null,
+      "cross_pol_max_db": -23.59299222846545
+    },
+    {
+      "element_id": "feed_TX_033",
+      "peak_dbi": 27.81408209912882,
+      "center_uv": [
+        -0.046441481776470575,
+        -0.019554308099607842
+      ],
+      "lobe_width_deg": 0.05560756374078403,
+      "first_sidelobe_db": -3.887149247317753,
+      "phase_span_rad": 6.2803103124591715,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24402576624128133,
+      "lobe_width_minor_deg": 0.21008257746891965,
+      "lobe_orientation_deg": 70.16543198424019,
+      "ellipticity": 1.1615706984430128,
+      "phase_slope_est_rad_per_deg": 101.66757565762782,
+      "phase_residual_rms_rad": 1.6771001829106058,
+      "first_null_radius_deg": 0.02199859664470577,
+      "cross_pol_max_db": -23.77847611459478
+    },
+    {
+      "element_id": "feed_TX_034",
+      "peak_dbi": 28.182567583031496,
+      "center_uv": [
+        -0.018332163841568605,
+        2.9019620040315885e-11
+      ],
+      "lobe_width_deg": 0.04155290477333312,
+      "first_sidelobe_db": -0.7801069794970961,
+      "phase_span_rad": 6.279720277084773,
+      "truncated": false,
+      "lobe_width_major_deg": 0.25071481710447685,
+      "lobe_width_minor_deg": 0.1425914044845887,
+      "lobe_orientation_deg": 58.84966989874784,
+      "ellipticity": 1.7582744065865072,
+      "phase_slope_est_rad_per_deg": 121.75005973814723,
+      "phase_residual_rms_rad": 1.6806746596805138,
+      "first_null_radius_deg": 0.034220039225097865,
+      "cross_pol_max_db": -24.05498545979369
+    },
+    {
+      "element_id": "feed_TX_035",
+      "peak_dbi": 28.082736276506747,
+      "center_uv": [
+        -0.003666432745098036,
+        -0.026887173647843127
+      ],
+      "lobe_width_deg": 0.07516187186941138,
+      "first_sidelobe_db": -1.388268737082881,
+      "phase_span_rad": 6.279873862257126,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2411009495518193,
+      "lobe_width_minor_deg": 0.16113340838274573,
+      "lobe_orientation_deg": 44.329204714640355,
+      "ellipticity": 1.496281571721762,
+      "phase_slope_est_rad_per_deg": 151.87378585892566,
+      "phase_residual_rms_rad": 1.6884917495883154,
+      "first_null_radius_deg": 0.05438541948274482,
+      "cross_pol_max_db": -23.810431237815713
+    },
+    {
+      "element_id": "feed_TX_036",
+      "peak_dbi": 27.837736227780315,
+      "center_uv": [
+        0.004888577061176486,
+        -0.03910861622823528
+      ],
+      "lobe_width_deg": 0.07577294399843099,
+      "first_sidelobe_db": -1.035897183124387,
+      "phase_span_rad": 6.280258894329091,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24060739742152953,
+      "lobe_width_minor_deg": 0.2232658201230495,
+      "lobe_orientation_deg": 18.543072655525265,
+      "ellipticity": 1.0776723337630565,
+      "phase_slope_est_rad_per_deg": 154.3840963689904,
+      "phase_residual_rms_rad": 1.6902722249983768,
+      "first_null_radius_deg": 0.02077645238666656,
+      "cross_pol_max_db": -23.536059191817458
+    },
+    {
+      "element_id": "feed_TX_037",
+      "peak_dbi": 27.600858065461495,
+      "center_uv": [
+        0.015887875383529426,
+        -0.05010791455058823
+      ],
+      "lobe_width_deg": 0.04155290477333312,
+      "first_sidelobe_db": -1.0552851203237035,
+      "phase_span_rad": 6.278978025376306,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2417882437198175,
+      "lobe_width_minor_deg": 0.23409792647923813,
+      "lobe_orientation_deg": 3.4373267750129344,
+      "ellipticity": 1.0328508558629264,
+      "phase_slope_est_rad_per_deg": 156.89440687905562,
+      "phase_residual_rms_rad": 1.6902109336646582,
+      "first_null_radius_deg": 0.02077645238666656,
+      "cross_pol_max_db": -23.3587166291904
+    },
+    {
+      "element_id": "feed_TX_038",
+      "peak_dbi": 27.350782708273428,
+      "center_uv": [
+        0.025665029447843157,
+        -0.06232935713098038
+      ],
+      "lobe_width_deg": 0.04094183264431352,
+      "first_sidelobe_db": -1.0452981516569166,
+      "phase_span_rad": 6.279882344628514,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2406084805954852,
+      "lobe_width_minor_deg": 0.23789319795322567,
+      "lobe_orientation_deg": -16.539818167719034,
+      "ellipticity": 1.0114138725513009,
+      "phase_slope_est_rad_per_deg": 159.40471738912038,
+      "phase_residual_rms_rad": 1.68921506390202,
+      "first_null_radius_deg": 0.02077645238666656,
+      "cross_pol_max_db": -23.25226946904996
+    },
+    {
+      "element_id": "feed_TX_039",
+      "peak_dbi": 27.077651457097197,
+      "center_uv": [
+        0.03788647202823531,
+        0.07332865551137258
+      ],
+      "lobe_width_deg": 0.03971968838627431,
+      "first_sidelobe_db": -0.3421099795787381,
+      "phase_span_rad": 6.279027468758576,
+      "truncated": false,
+      "lobe_width_major_deg": 0.23950265105995336,
+      "lobe_width_minor_deg": 0.23901713832312635,
+      "lobe_orientation_deg": 85.69681970322551,
+      "ellipticity": 1.0020312883847293,
+      "phase_slope_est_rad_per_deg": 161.91502789918513,
+      "phase_residual_rms_rad": 1.6920122682521264,
+      "first_null_radius_deg": 0.028720390063921422,
+      "cross_pol_max_db": -23.090452991397537
+    },
+    {
+      "element_id": "feed_TX_040",
+      "peak_dbi": 27.367817525354564,
+      "center_uv": [
+        -0.046441481776470575,
+        0.04644148183450983
+      ],
+      "lobe_width_deg": 0.04033076051529391,
+      "first_sidelobe_db": null,
+      "phase_span_rad": 6.279722937729223,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24108645981280946,
+      "lobe_width_minor_deg": 0.2332987111173452,
+      "lobe_orientation_deg": 68.687070754766,
+      "ellipticity": 1.0333810189441945,
+      "phase_slope_est_rad_per_deg": 116.72943871801726,
+      "phase_residual_rms_rad": 1.698043484304932,
+      "first_null_radius_deg": null,
+      "cross_pol_max_db": -23.28923021966307
+    },
+    {
+      "element_id": "feed_TX_041",
+      "peak_dbi": 27.66900299466212,
+      "center_uv": [
+        -0.034220039196078425,
+        0.03544218351215689
+      ],
+      "lobe_width_deg": 0.03971968838627431,
+      "first_sidelobe_db": null,
+      "phase_span_rad": 6.28011018181748,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24096679194956142,
+      "lobe_width_minor_deg": 0.22569247191353622,
+      "lobe_orientation_deg": 57.317650614269375,
+      "ellipticity": 1.0676775787270247,
+      "phase_slope_est_rad_per_deg": 114.21912820795251,
+      "phase_residual_rms_rad": 1.697194331177615,
+      "first_null_radius_deg": null,
+      "cross_pol_max_db": -23.491104425766757
+    },
+    {
+      "element_id": "feed_TX_042",
+      "peak_dbi": 27.915693326596486,
+      "center_uv": [
+        -0.02077645235764705,
+        0.025665029447843157
+      ],
+      "lobe_width_deg": 0.03971968838627431,
+      "first_sidelobe_db": null,
+      "phase_span_rad": 6.280118472323706,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2564202751152265,
+      "lobe_width_minor_deg": 0.15641231427145474,
+      "lobe_orientation_deg": 51.980239006575026,
+      "ellipticity": 1.639386747198224,
+      "phase_slope_est_rad_per_deg": 110.45366244285515,
+      "phase_residual_rms_rad": 1.6924156041335872,
+      "first_null_radius_deg": null,
+      "cross_pol_max_db": -23.63962645742095
+    },
+    {
+      "element_id": "feed_TX_043",
+      "peak_dbi": 28.295464891922034,
+      "center_uv": [
+        -0.02199859661568626,
+        -0.015887875325490186
+      ],
+      "lobe_width_deg": 0.04033076051529391,
+      "first_sidelobe_db": -1.2595324572170346,
+      "phase_span_rad": 6.279953195477242,
+      "truncated": false,
+      "lobe_width_major_deg": 0.25049575740745356,
+      "lobe_width_minor_deg": 0.13482059653308529,
+      "lobe_orientation_deg": 53.22676451154044,
+      "ellipticity": 1.857993243235512,
+      "phase_slope_est_rad_per_deg": 123.00521499317938,
+      "phase_residual_rms_rad": 1.6856586950022554,
+      "first_null_radius_deg": 0.036664327741176284,
+      "cross_pol_max_db": -23.93231962786926
+    },
+    {
+      "element_id": "feed_TX_044",
+      "peak_dbi": 27.891045070843287,
+      "center_uv": [
+        -0.008555009777254902,
+        -0.04277504900235293
+      ],
+      "lobe_width_deg": 0.04399719328941154,
+      "first_sidelobe_db": -1.2048706384817278,
+      "phase_span_rad": 6.279912665921949,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24854047132646045,
+      "lobe_width_minor_deg": 0.1613754278054144,
+      "lobe_orientation_deg": 52.526812821122576,
+      "ellipticity": 1.5401382645823205,
+      "phase_slope_est_rad_per_deg": 151.87378585892566,
+      "phase_residual_rms_rad": 1.6839562339550955,
+      "first_null_radius_deg": 0.054996491611764425,
+      "cross_pol_max_db": -23.00601401380023
+    },
+    {
+      "element_id": "feed_TX_045",
+      "peak_dbi": 27.640106024214145,
+      "center_uv": [
+        0.0012221442870588295,
+        -0.05377434732470587
+      ],
+      "lobe_width_deg": 0.04155290477333312,
+      "first_sidelobe_db": -1.0226331127570778,
+      "phase_span_rad": 6.279567468554134,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2419135064117115,
+      "lobe_width_minor_deg": 0.23486818107326157,
+      "lobe_orientation_deg": 55.2687417045202,
+      "ellipticity": 1.029996934051498,
+      "phase_slope_est_rad_per_deg": 156.89440687905562,
+      "phase_residual_rms_rad": 1.693225962503662,
+      "first_null_radius_deg": 0.01955430812862735,
+      "cross_pol_max_db": -22.830101674886567
+    },
+    {
+      "element_id": "feed_TX_046",
+      "peak_dbi": 27.398749130810337,
+      "center_uv": [
+        0.01099929835137256,
+        -0.06599578990509802
+      ],
+      "lobe_width_deg": 0.04094183264431352,
+      "first_sidelobe_db": -0.9037445679407881,
+      "phase_span_rad": 6.280473208978872,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2430888794264502,
+      "lobe_width_minor_deg": 0.24126977380755582,
+      "lobe_orientation_deg": 31.58941210800512,
+      "ellipticity": 1.007539716186518,
+      "phase_slope_est_rad_per_deg": 159.40471738912038,
+      "phase_residual_rms_rad": 1.6933739543615127,
+      "first_null_radius_deg": 0.0519411309666664,
+      "cross_pol_max_db": -22.748077348249932
+    },
+    {
+      "element_id": "feed_TX_047",
+      "peak_dbi": 27.308165215622452,
+      "center_uv": [
+        0.02322074093176471,
+        0.06844007847921571
+      ],
+      "lobe_width_deg": 0.04033076051529391,
+      "first_sidelobe_db": -1.2136469681476034,
+      "phase_span_rad": 6.280425281394324,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24009580782622988,
+      "lobe_width_minor_deg": 0.2389057906735701,
+      "lobe_orientation_deg": 7.359906296191184,
+      "ellipticity": 1.004981114728549,
+      "phase_slope_est_rad_per_deg": 160.65987264415298,
+      "phase_residual_rms_rad": 1.6908472804042847,
+      "first_null_radius_deg": 0.02199859664470577,
+      "cross_pol_max_db": -23.191493716770665
+    },
+    {
+      "element_id": "feed_TX_048",
+      "peak_dbi": 27.314754867234786,
+      "center_uv": [
+        0.03422003925411765,
+        0.05744078015686277
+      ],
+      "lobe_width_deg": 0.0391086162572547,
+      "first_sidelobe_db": -0.3056411578126229,
+      "phase_span_rad": 6.280485647318142,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24093584594807932,
+      "lobe_width_minor_deg": 0.23674107465433772,
+      "lobe_orientation_deg": 29.448249475256063,
+      "ellipticity": 1.0177188149537055,
+      "phase_slope_est_rad_per_deg": 159.40471738912038,
+      "phase_residual_rms_rad": 1.6896834170769002,
+      "first_null_radius_deg": 0.026887173676862608,
+      "cross_pol_max_db": -23.09696509589763
+    },
+    {
+      "element_id": "feed_TX_049",
+      "peak_dbi": 27.45248696307737,
+      "center_uv": [
+        -0.05010791455058823,
+        0.03177575073803923
+      ],
+      "lobe_width_deg": 0.04094183264431352,
+      "first_sidelobe_db": null,
+      "phase_span_rad": 6.28001280394616,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24468240636381466,
+      "lobe_width_minor_deg": 0.23361691891211858,
+      "lobe_orientation_deg": 48.931836959222025,
+      "ellipticity": 1.047365950647858,
+      "phase_slope_est_rad_per_deg": 114.21912820795251,
+      "phase_residual_rms_rad": 1.6988318365200135,
+      "first_null_radius_deg": null,
+      "cross_pol_max_db": -22.834965807574093
+    },
+    {
+      "element_id": "feed_TX_050",
+      "peak_dbi": 27.757541965464586,
+      "center_uv": [
+        -0.03788647197019607,
+        0.020776452415686292
+      ],
+      "lobe_width_deg": 0.04094183264431352,
+      "first_sidelobe_db": null,
+      "phase_span_rad": 6.2798397979959155,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24526808806835837,
+      "lobe_width_minor_deg": 0.2214341443351078,
+      "lobe_orientation_deg": 47.31393533914252,
+      "ellipticity": 1.1076344563067086,
+      "phase_slope_est_rad_per_deg": 111.7088176978873,
+      "phase_residual_rms_rad": 1.6982179778824105,
+      "first_null_radius_deg": null,
+      "cross_pol_max_db": -23.09915257518693
+    },
+    {
+      "element_id": "feed_TX_051",
+      "peak_dbi": 28.00247426871011,
+      "center_uv": [
+        -0.02322074087372547,
+        0.01099929835137256
+      ],
+      "lobe_width_deg": 0.04033076051529391,
+      "first_sidelobe_db": null,
+      "phase_span_rad": 6.280221289148434,
+      "truncated": false,
+      "lobe_width_major_deg": 0.25826478827371974,
+      "lobe_width_minor_deg": 0.1487409462346119,
+      "lobe_orientation_deg": 47.4547110269295,
+      "ellipticity": 1.7363395541827051,
+      "phase_slope_est_rad_per_deg": 110.45366244285515,
+      "phase_residual_rms_rad": 1.6938367271881152,
+      "first_null_radius_deg": null,
+      "cross_pol_max_db": -23.30898400911526
+    },
+    {
+      "element_id": "feed_TX_052",
+      "peak_dbi": 28.253891800902117,
+      "center_uv": [
+        -0.024442885131764708,
+        -0.028109317905882336
+      ],
+      "lobe_width_deg": 0.04155290477333312,
+      "first_sidelobe_db": -1.9210883702371204,
+      "phase_span_rad": 6.279732229384965,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2501287097740193,
+      "lobe_width_minor_deg": 0.12379404525623243,
+      "lobe_orientation_deg": 44.90894255321271,
+      "ellipticity": 2.020522952104003,
+      "phase_slope_est_rad_per_deg": 123.00521499317938,
+      "phase_residual_rms_rad": 1.6783703655671218,
+      "first_null_radius_deg": 0.04155290477333312,
+      "cross_pol_max_db": -23.53680608797109
+    },
+    {
+      "element_id": "feed_TX_053",
+      "peak_dbi": 27.95577813714783,
+      "center_uv": [
+        -0.024442885131764708,
+        -0.046441481776470575
+      ],
+      "lobe_width_deg": 0.04521933754745075,
+      "first_sidelobe_db": -1.1305613441932643,
+      "phase_span_rad": 6.2801232937558975,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24013447417021289,
+      "lobe_width_minor_deg": 0.15266791049279188,
+      "lobe_orientation_deg": 59.78153796345376,
+      "ellipticity": 1.572920421816808,
+      "phase_slope_est_rad_per_deg": 110.45366244285515,
+      "phase_residual_rms_rad": 1.6694742731397758,
+      "first_null_radius_deg": 0.02077645238666656,
+      "cross_pol_max_db": -23.131311382653585
+    },
+    {
+      "element_id": "feed_TX_054",
+      "peak_dbi": 27.72383843054536,
+      "center_uv": [
+        -0.01344358680941174,
+        -0.057440780098823516
+      ],
+      "lobe_width_deg": 0.04277504903137233,
+      "first_sidelobe_db": -1.1100338140359762,
+      "phase_span_rad": 6.279929552463707,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24385061249882628,
+      "lobe_width_minor_deg": 0.20674241928081105,
+      "lobe_orientation_deg": 74.09712481663544,
+      "ellipticity": 1.179489982496589,
+      "phase_slope_est_rad_per_deg": 156.89440687905562,
+      "phase_residual_rms_rad": 1.6822356422059928,
+      "first_null_radius_deg": 0.02077645238666656,
+      "cross_pol_max_db": -22.917527889392296
+    },
+    {
+      "element_id": "feed_TX_055",
+      "peak_dbi": 27.486416343495307,
+      "center_uv": [
+        -0.003666432745098036,
+        -0.06966222267921568
+      ],
+      "lobe_width_deg": 0.042163976902352726,
+      "first_sidelobe_db": -0.9599061856838922,
+      "phase_span_rad": 6.280373650801217,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24199908894879338,
+      "lobe_width_minor_deg": 0.23714851717665042,
+      "lobe_orientation_deg": 84.21391265647952,
+      "ellipticity": 1.0204537301345629,
+      "phase_slope_est_rad_per_deg": 158.14956213408777,
+      "phase_residual_rms_rad": 1.6940022963380879,
+      "first_null_radius_deg": 0.02077645238666656,
+      "cross_pol_max_db": -22.782427346459826
+    },
+    {
+      "element_id": "feed_TX_056",
+      "peak_dbi": 27.452874883187874,
+      "center_uv": [
+        0.0073328655772549045,
+        0.06477364570509805
+      ],
+      "lobe_width_deg": 0.04155290477333312,
+      "first_sidelobe_db": -0.9313583141561275,
+      "phase_span_rad": 6.27920358803738,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24252312668004977,
+      "lobe_width_minor_deg": 0.24105242229874935,
+      "lobe_orientation_deg": -35.522716256447126,
+      "ellipticity": 1.0061011806779427,
+      "phase_slope_est_rad_per_deg": 158.14956213408777,
+      "phase_residual_rms_rad": 1.6934941700039436,
+      "first_null_radius_deg": 0.02077645238666656,
+      "cross_pol_max_db": -22.762113155083288
+    },
+    {
+      "element_id": "feed_TX_057",
+      "peak_dbi": 27.53656760761495,
+      "center_uv": [
+        0.018332163899607845,
+        0.053774347382745113
+      ],
+      "lobe_width_deg": 0.042163976902352726,
+      "first_sidelobe_db": -1.0207231431902741,
+      "phase_span_rad": 6.280378226035127,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24152550147961113,
+      "lobe_width_minor_deg": 0.2356649584743351,
+      "lobe_orientation_deg": -0.5311708169061546,
+      "ellipticity": 1.024868113796877,
+      "phase_slope_est_rad_per_deg": 156.89440687905562,
+      "phase_residual_rms_rad": 1.6887971998800404,
+      "first_null_radius_deg": 0.0519411309666664,
+      "cross_pol_max_db": -23.24208840250992
+    },
+    {
+      "element_id": "feed_TX_058",
+      "peak_dbi": 27.52016310277563,
+      "center_uv": [
+        0.029331462221960786,
+        0.04277504906039217
+      ],
+      "lobe_width_deg": 0.042163976902352726,
+      "first_sidelobe_db": -0.9887127189113749,
+      "phase_span_rad": 6.280564609282612,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24240446095917814,
+      "lobe_width_minor_deg": 0.23153766253969293,
+      "lobe_orientation_deg": 23.588543271804014,
+      "ellipticity": 1.0469331783878673,
+      "phase_slope_est_rad_per_deg": 156.89440687905562,
+      "phase_residual_rms_rad": 1.6880853171571952,
+      "first_null_radius_deg": 0.01955430812862735,
+      "cross_pol_max_db": -23.125986624329435
+    },
+    {
+      "element_id": "feed_TX_059",
+      "peak_dbi": 27.698499042976266,
+      "center_uv": [
+        -0.02077645235764705,
+        0.0366643277701961
+      ],
+      "lobe_width_deg": 0.07271758335333296,
+      "first_sidelobe_db": -2.0102115767584667,
+      "phase_span_rad": 6.2799394163947255,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24508441237475376,
+      "lobe_width_minor_deg": 0.22555170734115126,
+      "lobe_orientation_deg": 32.48721147273639,
+      "ellipticity": 1.086599677137708,
+      "phase_slope_est_rad_per_deg": 109.19850718782254,
+      "phase_residual_rms_rad": 1.6929506805281904,
+      "first_null_radius_deg": 0.02077645238666656,
+      "cross_pol_max_db": -22.861575129911486
+    },
+    {
+      "element_id": "feed_TX_060",
+      "peak_dbi": 27.950052162709092,
+      "center_uv": [
+        -0.007332865519215664,
+        0.025665029447843157
+      ],
+      "lobe_width_deg": 0.07210651122431336,
+      "first_sidelobe_db": -2.2633535309201087,
+      "phase_span_rad": 6.279809664399478,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2461433586457407,
+      "lobe_width_minor_deg": 0.20827401771625575,
+      "lobe_orientation_deg": 38.99632761722029,
+      "ellipticity": 1.1818246046469254,
+      "phase_slope_est_rad_per_deg": 105.43304142272518,
+      "phase_residual_rms_rad": 1.6814749675528637,
+      "first_null_radius_deg": 0.02199859664470577,
+      "cross_pol_max_db": -23.083330857622663
+    },
+    {
+      "element_id": "feed_TX_061",
+      "peak_dbi": 28.18060273292052,
+      "center_uv": [
+        0.002444288545098039,
+        0.01344358686745098
+      ],
+      "lobe_width_deg": 0.07271758335333296,
+      "first_sidelobe_db": -2.368405906543043,
+      "phase_span_rad": 6.279954577489265,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2510945927253625,
+      "lobe_width_minor_deg": 0.12770852531749752,
+      "lobe_orientation_deg": 37.52910189579558,
+      "ellipticity": 1.9661537246719714,
+      "phase_slope_est_rad_per_deg": 100.41242040259567,
+      "phase_residual_rms_rad": 1.6819029698495667,
+      "first_null_radius_deg": 0.02199859664470577,
+      "cross_pol_max_db": -23.296622386164998
+    },
+    {
+      "element_id": "feed_TX_062",
+      "peak_dbi": 27.76762350413395,
+      "center_uv": [
+        -0.029331462163921546,
+        -0.06110721287294117
+      ],
+      "lobe_width_deg": 0.043386121160391936,
+      "first_sidelobe_db": -1.050300217250829,
+      "phase_span_rad": 6.280580341884888,
+      "truncated": false,
+      "lobe_width_major_deg": 0.23911436719975598,
+      "lobe_width_minor_deg": 0.18516934642715405,
+      "lobe_orientation_deg": 80.16224518493749,
+      "ellipticity": 1.2913280292525309,
+      "phase_slope_est_rad_per_deg": 114.21912820795251,
+      "phase_residual_rms_rad": 1.6720376176802252,
+      "first_null_radius_deg": 0.05560756374078403,
+      "cross_pol_max_db": -22.98660973695587
+    },
+    {
+      "element_id": "feed_TX_063",
+      "peak_dbi": 27.56921648767619,
+      "center_uv": [
+        -0.018332163841568605,
+        0.07088436699529413
+      ],
+      "lobe_width_deg": 0.04399719328941154,
+      "first_sidelobe_db": -1.0075046627775675,
+      "phase_span_rad": 6.279963319970095,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2440767067070862,
+      "lobe_width_minor_deg": 0.2116541360494028,
+      "lobe_orientation_deg": -89.12167576974089,
+      "ellipticity": 1.1531865677792166,
+      "phase_slope_est_rad_per_deg": 116.72943871801726,
+      "phase_residual_rms_rad": 1.6689448401994724,
+      "first_null_radius_deg": 0.02077645238666656,
+      "cross_pol_max_db": -22.822933793346483
+    },
+    {
+      "element_id": "feed_TX_064",
+      "peak_dbi": 27.643067703605787,
+      "center_uv": [
+        -0.007332865519215664,
+        0.05988506867294119
+      ],
+      "lobe_width_deg": 0.042163976902352726,
+      "first_sidelobe_db": -0.9996471128147455,
+      "phase_span_rad": 6.280419044512041,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2424084268759881,
+      "lobe_width_minor_deg": 0.22871138730878868,
+      "lobe_orientation_deg": -72.57745063020874,
+      "ellipticity": 1.059887877592674,
+      "phase_slope_est_rad_per_deg": 156.89440687905562,
+      "phase_residual_rms_rad": 1.690619805753298,
+      "first_null_radius_deg": 0.02077645238666656,
+      "cross_pol_max_db": -22.858357111287916
+    },
+    {
+      "element_id": "feed_TX_065",
+      "peak_dbi": 27.735851812886914,
+      "center_uv": [
+        0.003666432803137276,
+        0.04888577035058825
+      ],
+      "lobe_width_deg": 0.07577294399843099,
+      "first_sidelobe_db": -1.0377996535494973,
+      "phase_span_rad": 6.280115912836859,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2415048827273086,
+      "lobe_width_minor_deg": 0.23035901001297687,
+      "lobe_orientation_deg": -15.487818109057486,
+      "ellipticity": 1.0483847916940772,
+      "phase_slope_est_rad_per_deg": 156.89440687905562,
+      "phase_residual_rms_rad": 1.6912159067220511,
+      "first_null_radius_deg": 0.02077645238666656,
+      "cross_pol_max_db": -23.42647673070427
+    },
+    {
+      "element_id": "feed_TX_066",
+      "peak_dbi": 27.743915816879717,
+      "center_uv": [
+        0.015887875383529426,
+        0.03788647202823531
+      ],
+      "lobe_width_deg": 0.04399719328941154,
+      "first_sidelobe_db": -1.1587677593533385,
+      "phase_span_rad": 6.279180239289662,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24235220562074705,
+      "lobe_width_minor_deg": 0.22744546904705912,
+      "lobe_orientation_deg": 3.917729303477387,
+      "ellipticity": 1.0655398264742029,
+      "phase_slope_est_rad_per_deg": 154.3840963689904,
+      "phase_residual_rms_rad": 1.6898022679421603,
+      "first_null_radius_deg": 0.02077645238666656,
+      "cross_pol_max_db": -23.3227075290553
+    },
+    {
+      "element_id": "feed_TX_067",
+      "peak_dbi": 27.81561914447272,
+      "center_uv": [
+        0.029331462221960786,
+        0.03177575073803923
+      ],
+      "lobe_width_deg": 0.07455079974039178,
+      "first_sidelobe_db": -1.5647844234183694,
+      "phase_span_rad": 6.2803731307431345,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24343153826011085,
+      "lobe_width_minor_deg": 0.22437512585032066,
+      "lobe_orientation_deg": 13.905608060371378,
+      "ellipticity": 1.0849310383117183,
+      "phase_slope_est_rad_per_deg": 140.57738856363358,
+      "phase_residual_rms_rad": 1.6952279695192867,
+      "first_null_radius_deg": 0.02444288516078419,
+      "cross_pol_max_db": -22.869936777004995
+    },
+    {
+      "element_id": "feed_TX_068",
+      "peak_dbi": 27.949014821284273,
+      "center_uv": [
+        -0.024442885131764708,
+        0.020776452415686292
+      ],
+      "lobe_width_deg": 0.07332865548235257,
+      "first_sidelobe_db": -2.508782125308666,
+      "phase_span_rad": 6.28017992893759,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2426973578602683,
+      "lobe_width_minor_deg": 0.21274346810185354,
+      "lobe_orientation_deg": 17.895101485531825,
+      "ellipticity": 1.140798164219425,
+      "phase_slope_est_rad_per_deg": 105.43304142272518,
+      "phase_residual_rms_rad": 1.6845277912988836,
+      "first_null_radius_deg": 0.02199859664470577,
+      "cross_pol_max_db": -22.97303388866584
+    },
+    {
+      "element_id": "feed_TX_069",
+      "peak_dbi": 28.19534368317454,
+      "center_uv": [
+        -0.01099929829333332,
+        0.009777154093333351
+      ],
+      "lobe_width_deg": 0.07210651122431336,
+      "first_sidelobe_db": -2.5750996820234784,
+      "phase_span_rad": 6.27979488964308,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24794144684602873,
+      "lobe_width_minor_deg": 0.1253235761264646,
+      "lobe_orientation_deg": 28.173127373738396,
+      "ellipticity": 1.9784102441812692,
+      "phase_slope_est_rad_per_deg": 100.41242040259567,
+      "phase_residual_rms_rad": 1.6915516353530757,
+      "first_null_radius_deg": 0.02199859664470577,
+      "cross_pol_max_db": -23.192251387165577
+    },
+    {
+      "element_id": "feed_TX_070",
+      "peak_dbi": 27.716568414990522,
+      "center_uv": [
+        -0.0329978949380392,
+        0.06599578996313726
+      ],
+      "lobe_width_deg": 0.04399719328941154,
+      "first_sidelobe_db": -1.0752484776002151,
+      "phase_span_rad": 6.2800917080763545,
+      "truncated": false,
+      "lobe_width_major_deg": 0.23889040692375227,
+      "lobe_width_minor_deg": 0.18431764814530796,
+      "lobe_orientation_deg": -85.63374459506574,
+      "ellipticity": 1.2960799431176635,
+      "phase_slope_est_rad_per_deg": 112.9639729529199,
+      "phase_residual_rms_rad": 1.6752661246167848,
+      "first_null_radius_deg": 0.054996491611764425,
+      "cross_pol_max_db": -22.9449190879033
+    },
+    {
+      "element_id": "feed_TX_071",
+      "peak_dbi": 27.811794665072274,
+      "center_uv": [
+        -0.02199859661568626,
+        0.05499649164078432
+      ],
+      "lobe_width_deg": 0.043386121160391936,
+      "first_sidelobe_db": -1.0752097896302173,
+      "phase_span_rad": 6.280254932011558,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24119437755766723,
+      "lobe_width_minor_deg": 0.1885834392021574,
+      "lobe_orientation_deg": -72.85595985322483,
+      "ellipticity": 1.2789796313933592,
+      "phase_slope_est_rad_per_deg": 114.21912820795251,
+      "phase_residual_rms_rad": 1.6697655845662067,
+      "first_null_radius_deg": 0.05560756374078403,
+      "cross_pol_max_db": -23.001207847221323
+    },
+    {
+      "element_id": "feed_TX_072",
+      "peak_dbi": 27.870759056656965,
+      "center_uv": [
+        -0.009777154035294111,
+        0.04399719331843138
+      ],
+      "lobe_width_deg": 0.04277504903137233,
+      "first_sidelobe_db": -1.1838124410770248,
+      "phase_span_rad": 6.2805644674920185,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2441186355813113,
+      "lobe_width_minor_deg": 0.19130887190293494,
+      "lobe_orientation_deg": -61.03315546554043,
+      "ellipticity": 1.276044509348059,
+      "phase_slope_est_rad_per_deg": 154.3840963689904,
+      "phase_residual_rms_rad": 1.6831743740199197,
+      "first_null_radius_deg": 0.054996491611764425,
+      "cross_pol_max_db": -22.992466209768487
+    },
+    {
+      "element_id": "feed_TX_073",
+      "peak_dbi": 27.94955279720225,
+      "center_uv": [
+        0.0012221442870588295,
+        0.03299789499607844
+      ],
+      "lobe_width_deg": 0.07516187186941138,
+      "first_sidelobe_db": -1.2296493258343417,
+      "phase_span_rad": 6.280427337357132,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24684852421284956,
+      "lobe_width_minor_deg": 0.17565503052805062,
+      "lobe_orientation_deg": -37.87218845015846,
+      "ellipticity": 1.4053029023465966,
+      "phase_slope_est_rad_per_deg": 153.12894111395826,
+      "phase_residual_rms_rad": 1.6906977383485124,
+      "first_null_radius_deg": 0.02077645238666656,
+      "cross_pol_max_db": -23.580781817999995
+    },
+    {
+      "element_id": "feed_TX_074",
+      "peak_dbi": 28.00001153340109,
+      "center_uv": [
+        0.014665731125490217,
+        0.024442885189803948
+      ],
+      "lobe_width_deg": 0.07516187186941138,
+      "first_sidelobe_db": -1.6688747110591464,
+      "phase_span_rad": 6.279787160669508,
+      "truncated": false,
+      "lobe_width_major_deg": 0.24435699768843605,
+      "lobe_width_minor_deg": 0.1813432359950069,
+      "lobe_orientation_deg": -28.414140811116567,
+      "ellipticity": 1.3474833861195914,
+      "phase_slope_est_rad_per_deg": 145.59800958376354,
+      "phase_residual_rms_rad": 1.6927221190423054,
+      "first_null_radius_deg": 0.02322074090274498,
+      "cross_pol_max_db": -23.5292648215802
+    },
+    {
+      "element_id": "feed_TX_075",
+      "peak_dbi": 28.156556972570396,
+      "center_uv": [
+        0.025665029447843157,
+        0.015887875383529426
+      ],
+      "lobe_width_deg": 0.07332865548235257,
+      "first_sidelobe_db": -1.6469197794255606,
+      "phase_span_rad": 6.27951243792028,
+      "truncated": false,
+      "lobe_width_major_deg": 0.23952619733371128,
+      "lobe_width_minor_deg": 0.17807954812685686,
+      "lobe_orientation_deg": -22.542860742678215,
+      "ellipticity": 1.345051690961627,
+      "phase_slope_est_rad_per_deg": 96.64695463749831,
+      "phase_residual_rms_rad": 1.6776930289833782,
+      "first_null_radius_deg": 0.02444288516078419,
+      "cross_pol_max_db": -23.126096507500588
+    },
+    {
+      "element_id": "feed_TX_076",
+      "peak_dbi": 28.136692994762132,
+      "center_uv": [
+        -0.01344358680941174,
+        0.029331462221960786
+      ],
+      "lobe_width_deg": 0.07332865548235257,
+      "first_sidelobe_db": -1.2972710918538373,
+      "phase_span_rad": 6.280327412598589,
+      "truncated": false,
+      "lobe_width_major_deg": 0.23800890227701935,
+      "lobe_width_minor_deg": 0.15676557642858507,
+      "lobe_orientation_deg": -47.947112520503254,
+      "ellipticity": 1.518247230669578,
+      "phase_slope_est_rad_per_deg": 150.6186306038935,
+      "phase_residual_rms_rad": 1.678951954978522,
+      "first_null_radius_deg": 0.054996491611764425,
+      "cross_pol_max_db": -23.877638081871254
+    },
+    {
+      "element_id": "feed_TX_077",
+      "peak_dbi": 28.215948059563903,
+      "center_uv": [
+        2.9019620040315885e-11,
+        0.019554308157647082
+      ],
+      "lobe_width_deg": 0.07393972761137217,
+      "first_sidelobe_db": -1.7173255938185006,
+      "phase_span_rad": 6.280036695318627,
+      "truncated": false,
+      "lobe_width_major_deg": 0.23722503745967125,
+      "lobe_width_minor_deg": 0.15927546133103815,
+      "lobe_orientation_deg": -41.21213585616789,
+      "ellipticity": 1.4894010381588076,
+      "phase_slope_est_rad_per_deg": 144.34285432873094,
+      "phase_residual_rms_rad": 1.6915312389174693,
+      "first_null_radius_deg": 0.05438541948274482,
+      "cross_pol_max_db": -23.85053994832168
+    },
+    {
+      "element_id": "feed_TX_078",
+      "peak_dbi": 28.374618823530394,
+      "center_uv": [
+        0.01099929835137256,
+        0.009777154093333351
+      ],
+      "lobe_width_deg": 0.07332865548235257,
+      "first_sidelobe_db": -1.6255572591891376,
+      "phase_span_rad": 6.27989249434735,
+      "truncated": false,
+      "lobe_width_major_deg": 0.23241566431039212,
+      "lobe_width_minor_deg": 0.15680204617693674,
+      "lobe_orientation_deg": -34.027216837772016,
+      "ellipticity": 1.4822234146621551,
+      "phase_slope_est_rad_per_deg": 95.3917993824657,
+      "phase_residual_rms_rad": 1.6775746759502248,
+      "first_null_radius_deg": 0.02322074090274498,
+      "cross_pol_max_db": -23.375119930822184
+    },
+    {
+      "element_id": "feed_TX_079",
+      "peak_dbi": 28.542595752273844,
+      "center_uv": [
+        -0.0012221442290195894,
+        0.002444288545098039
+      ],
+      "lobe_width_deg": 0.04277504903137233,
+      "first_sidelobe_db": -0.919922436197559,
+      "phase_span_rad": 6.280063568538714,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2393092462375933,
+      "lobe_width_minor_deg": 0.11178133213302524,
+      "lobe_orientation_deg": -67.80085908276374,
+      "ellipticity": 2.140869514355077,
+      "phase_slope_est_rad_per_deg": 69.03353902678464,
+      "phase_residual_rms_rad": 1.699419544361716,
+      "first_null_radius_deg": 0.035442183483137074,
+      "cross_pol_max_db": -24.25622614564486
+    },
+    {
+      "element_id": "feed_TX_080",
+      "peak_dbi": 28.22651871148735,
+      "center_uv": [
+        -0.014665731067450977,
+        -0.006110721261176455
+      ],
+      "lobe_width_deg": 0.07149543909529375,
+      "first_sidelobe_db": -2.609213088352228,
+      "phase_span_rad": 6.280111111530166,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2376337416128769,
+      "lobe_width_minor_deg": 0.11088456611487099,
+      "lobe_orientation_deg": -18.99688965761581,
+      "ellipticity": 2.1430731971003065,
+      "phase_slope_est_rad_per_deg": 35.144347140908394,
+      "phase_residual_rms_rad": 1.660562313618488,
+      "first_null_radius_deg": 0.02199859664470577,
+      "cross_pol_max_db": -23.185645275021535
+    },
+    {
+      "element_id": "feed_TX_081",
+      "peak_dbi": 28.219931508193245,
+      "center_uv": [
+        0.0366643277701961,
+        0.004888577061176486
+      ],
+      "lobe_width_deg": 0.07332865548235257,
+      "first_sidelobe_db": -1.6713868217255494,
+      "phase_span_rad": 6.280221412807107,
+      "truncated": false,
+      "lobe_width_major_deg": 0.23153830599403516,
+      "lobe_width_minor_deg": 0.15852784171713127,
+      "lobe_orientation_deg": 0.8321448911297296,
+      "ellipticity": 1.4605529444296599,
+      "phase_slope_est_rad_per_deg": 41.42012341607051,
+      "phase_residual_rms_rad": 1.6330459021401686,
+      "first_null_radius_deg": 0.02444288516078419,
+      "cross_pol_max_db": -23.165866863476797
+    },
+    {
+      "element_id": "feed_TX_082",
+      "peak_dbi": 28.05566124140025,
+      "center_uv": [
+        -0.024442885131764708,
+        0.040330760544313726
+      ],
+      "lobe_width_deg": 0.07332865548235257,
+      "first_sidelobe_db": -1.2388199321546551,
+      "phase_span_rad": 6.280031547195822,
+      "truncated": false,
+      "lobe_width_major_deg": 0.2381504739921686,
+      "lobe_width_minor_deg": 0.15026945000540362,
+      "lobe_orientation_deg": -58.431860699910786,
+      "ellipticity": 1.5848229562536151,
+      "phase_slope_est_rad_per_deg": 107.94335193279039,
+      "phase_residual_rms_rad": 1.6700155506050822,
+      "first_null_radius_deg": 0.02199859664470577,
+      "cross_pol_max_db": -23.223433728557062
+    }
+  ],
+  "peak_dbi_mean": 27.875117728725055,
+  "peak_dbi_min": 27.077651457097197,
+  "peak_dbi_max": 28.542595752273844,
+  "peak_dbi_std": 0.3250926068284407,
+  "lobe_width_deg_mean": 0.05509336890051144,
+  "n_with_sidelobes": 66,
+  "first_sidelobe_db_mean": -1.6008768344511062,
+  "spacing_deg_mean": 0.009391008141292704,
+  "spacing_deg_min": 0.0027327976392867164,
+  "n_truncated": 0,
+  "lobe_ellipticity_mean": 1.3907336622100344,
+  "phase_slope_est_mean_rad_per_deg": 120.63266542574013,
+  "phase_residual_rms_mean_rad": 1.685017543731877,
+  "first_null_radius_deg_mean": 0.029738843612287433,
+  "taper_hint": "uniform-like",
+  "lattice_hex_like": false,
+  "cross_pol_max_db": -22.748077348249932,
+  "hypotheses": {
+    "peak_gain_ok": false,
+    "gaussian_like": false,
+    "phase_ramp_present": true,
+    "all_elements_well_framed": true,
+    "peak_physical": true
+  },
+  "estimated_params": {
+    "mode": "airy",
+    "peak_gain_dbi": 27.875117728725055,
+    "sigma": 0.029738843612287433,
+    "phase_slope_radial": 120.63266542574013,
+    "spacing_deg": 0.009391008141292704
+  }
+}

@@ -30,3 +30,20 @@ def test_gaussian_spec_requires_positive_sigma() -> None:
 def test_gaussian_spec_defaults_phase_slope_zero() -> None:
     spec = GaussianSpec(center_uv=(1.0, 2.0), sigma=0.5, peak_gain_dbi=40.0)
     assert spec.phase_slope_radial == 0.0
+
+
+def test_elliptical_spec_requires_positive_sigmas() -> None:
+    from grd_generator.schemas import EllipticalSpec
+    with pytest.raises(ValidationError):
+        EllipticalSpec(center_uv=(0.0, 0.0), sigma_major=0.0, sigma_minor=0.1, peak_gain_dbi=28.0)
+    with pytest.raises(ValidationError):
+        EllipticalSpec(center_uv=(0.0, 0.0), sigma_major=0.1, sigma_minor=-0.1, peak_gain_dbi=28.0)
+
+
+def test_elliptical_spec_defaults() -> None:
+    from grd_generator.schemas import EllipticalSpec
+    spec = EllipticalSpec(
+        center_uv=(1.0, 2.0), sigma_major=0.05, sigma_minor=0.03, peak_gain_dbi=28.0
+    )
+    assert spec.orientation_deg == 0.0
+    assert spec.phase_slope_radial == 0.0

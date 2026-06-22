@@ -20,6 +20,7 @@ dev = [
 
 [project.scripts]
 grd-generate = "grd_generator.generate:main"
+grd-calibrate = "grd_generator.calibrate:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -50,6 +51,7 @@ source = ["src/grd_generator"]
 branch = true
 omit = [
     "*/grd_generator/generate.py",       # script offline : orchestration + écriture .npz
+    "*/grd_generator/calibrate.py",      # script offline : sampling + écriture .npz + CLI
     "*/grd_generator/examples/*",        # scripts d'exemple : testés en lancement
     "*/tests/*",
 ]
