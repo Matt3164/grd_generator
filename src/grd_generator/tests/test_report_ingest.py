@@ -32,7 +32,9 @@ def test_read_report_0001_gaussian_no_null() -> None:
 
 def test_read_report_rejects_empty_elements(tmp_path: Path) -> None:
     p = tmp_path / "report.json"
-    p.write_text(json.dumps({"elements": [], "estimated_params": {"mode": "gaussian", "spacing_deg": 1.0}}))
+    p.write_text(
+        json.dumps({"elements": [], "estimated_params": {"mode": "gaussian", "spacing_deg": 1.0}})
+    )
     with pytest.raises(ValueError):
         read_report(p)
 
