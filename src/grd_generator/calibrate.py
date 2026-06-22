@@ -35,8 +35,8 @@ def _hex_centers(n: int, spacing: float) -> list[tuple[float, float]]:
 
 
 def _fold_orientation(deg: float) -> float:
-    """Replie un angle dans l'intervalle (−90, 90]."""
-    return ((deg + 90.0) % 180.0) - 90.0
+    """Replie un angle dans l'intervalle (−90, 90] (axe d'ellipse, période 180°)."""
+    return 90.0 - ((90.0 - deg) % 180.0)
 
 
 def _grid_for(
