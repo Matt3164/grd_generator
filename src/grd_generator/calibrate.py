@@ -148,9 +148,30 @@ def validate_against(
     """
     gen_peak = float(np.mean([s.peak_gain_dbi for s in specs]))
     gen_phase = float(np.mean([s.phase_slope_radial for s in specs]))
+    gen_sigma_major = float(np.mean([s.sigma_major for s in specs]))
+    gen_sigma_minor = float(np.mean([s.sigma_minor for s in specs]))
+    # Ellipticité = rapport des moyennes (et non moyenne des rapports) : même
+    # définition que la cible mesurée, sans le biais de Jensen sur les ratios.
+    gen_ellipticity = gen_sigma_major / gen_sigma_minor
+    # Cibles mesurées pour la valeur ajoutée du feature (lobes elliptiques) :
+    # l'ellipticité = rapport des largeurs ; l'échelle σ_major via la même
+    # conversion largeur→σ que la génération. L'orientation n'est PAS diagnostiquée
+    # par sa moyenne (≈ 0, distribution quasi-uniforme d'axes : moyenne non informative).
+    measured_ellipticity = stats.lobe_width_major_deg.mean / stats.lobe_width_minor_deg.mean
+    first_null_mean = (
+        None if stats.first_null_radius_deg is None else stats.first_null_radius_deg.mean
+    )
+    measured_sigma_major, _ = widths_to_sigmas(
+        stats.mode,
+        stats.lobe_width_major_deg.mean,
+        stats.lobe_width_minor_deg.mean,
+        first_null_mean,
+    )
     checks: list[tuple[str, float, float]] = [
         ("peak_dbi", stats.peak_dbi.mean, gen_peak),
         ("phase_slope_rad_per_deg", stats.phase_slope_rad_per_deg.mean, gen_phase),
+        ("ellipticity", measured_ellipticity, gen_ellipticity),
+        ("sigma_major_deg", measured_sigma_major, gen_sigma_major),
     ]
     deviations: list[dict[str, object]] = []
     for field, measured, generated in checks:

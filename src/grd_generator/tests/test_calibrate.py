@@ -57,6 +57,16 @@ def test_validate_against_flags_off_specs() -> None:
     assert any(d["field"] == "peak_dbi" for d in devs)
 
 
+def test_validate_against_flags_circular_ellipticity() -> None:
+    # 0001 has elliptical lobes (measured ellipticity ~1.7); forcing the specs
+    # circular (sigma_major == sigma_minor -> ellipticity 1.0) must be flagged.
+    stats = read_report(REPORTS / "0001")
+    specs, _ = calibrate(stats, seed=0)
+    circular = [s.model_copy(update={"sigma_minor": s.sigma_major}) for s in specs]
+    devs = validate_against(stats, circular)
+    assert any(d["field"] == "ellipticity" for d in devs)
+
+
 def test_generate_calibrated_end_to_end(tmp_path: Path) -> None:
     out = generate_calibrated(REPORTS / "0000", tmp_path / "cal0000.npz", seed=0)
     assert out.exists()
