@@ -13,6 +13,7 @@ dependencies = [
 [project.optional-dependencies]
 viz = [
     "matplotlib>=3.9",  # rendu des diagrammes (script plot.py, extra optionnel)
+    "pyqt6>=6.7",  # backend QtAgg → fenêtre native pour grd-plot (auto-sélectionné si DISPLAY)
 ]
 
 [dependency-groups]
