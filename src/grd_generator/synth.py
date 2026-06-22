@@ -128,7 +128,7 @@ def widths_to_sigmas(
 
     `gaussian` : σ = largeur / (2·√ln2) (même convention que grd_analyzer).
     `airy` (avec `first_null`) : on préserve l'ellipticité autour du premier null —
-    moyenne géométrique des σ = `first_null`, rapport = √(width_major/width_minor).
+    moyenne géométrique des σ = `first_null`, rapport σ_major/σ_minor = width_major/width_minor.
     `airy` sans `first_null` : repli sur la conversion gaussian.
     """
     if mode not in ("gaussian", "airy"):
