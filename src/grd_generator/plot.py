@@ -208,6 +208,41 @@ def _draw_earth_centers(
     ax.set_title(f"Barycentres sur Terre ({len(centers)})")
 
 
+def draw_earth_envelope_contours(
+    ax: Any,
+    grid: UVGrid,
+    envelope_dbi: NDArray[np.float64],
+    *,
+    sat_lon: float,
+    b_lat: float,
+    b_lon: float,
+    step_db: float = 5.0,
+) -> None:
+    """Enveloppe max projetée sur la Terre en isolignes (tous les `step_db` dB)."""
+    gu, gv = grid.meshgrid()
+    lat, lon, hit = _project(gu, gv, sat_lon, b_lat, b_lon)
+    if not np.any(hit):  # pragma: no cover
+        _draw_coastlines(ax, -180.0, 180.0, -90.0, 90.0)
+        ax.set_title("Enveloppe sur Terre — isolignes")
+        return
+    z = np.ma.masked_invalid(np.where(hit, envelope_dbi, np.nan))
+    # contour exige des coordonnées finies ; les cellules hors-disque (Z masqué)
+    # ne sont pas tracées, donc leur coordonnée de remplissage est sans effet.
+    lon_fill = np.where(hit, lon, float(np.mean(lon[hit])))
+    lat_fill = np.where(hit, lat, float(np.mean(lat[hit])))
+    vmax = float(np.max(envelope_dbi[hit]))
+    levels = np.arange(vmax - _DYN_RANGE_DB, vmax + step_db, step_db)
+    cs = ax.contour(lon_fill, lat_fill, z, levels=levels, cmap="viridis")
+    ax.clabel(cs, inline=True, fontsize=7, fmt="%.0f")
+    pad = 5.0
+    win = (
+        float(lon[hit].min()) - pad, float(lon[hit].max()) + pad,
+        float(lat[hit].min()) - pad, float(lat[hit].max()) + pad,
+    )
+    _draw_coastlines(ax, *win)
+    ax.set_title(f"Enveloppe sur Terre — isolignes ({int(step_db)} dB)")
+
+
 def render(
     npz_path: str | Path,
     *,
