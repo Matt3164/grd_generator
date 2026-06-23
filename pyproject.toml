@@ -10,6 +10,12 @@ dependencies = [
     "loguru>=0.7",
 ]
 
+[project.optional-dependencies]
+viz = [
+    "matplotlib>=3.9",  # rendu des diagrammes (script plot.py, extra optionnel)
+    "pyqt6>=6.7",  # backend QtAgg → fenêtre native pour grd-plot (auto-sélectionné si DISPLAY)
+]
+
 [dependency-groups]
 dev = [
     "pytest>=8.2",
@@ -21,6 +27,8 @@ dev = [
 [project.scripts]
 grd-generate = "grd_generator.generate:main"
 grd-calibrate = "grd_generator.calibrate:main"
+grd-plot = "grd_generator.plot:main"
+grd-gui = "grd_generator.gui:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -41,6 +49,22 @@ python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
 
+# matplotlib (extra viz) n'a pas de stubs : le rendu (plot.py, hors couverture)
+# est vérifié au mieux sans typage de la lib graphique.
+[[tool.mypy.overrides]]
+module = ["matplotlib.*"]
+ignore_missing_imports = true
+
+# PyQt6 : subclassing QMainWindow (Any sans stubs complets) toléré dans gui.py seul.
+[[tool.mypy.overrides]]
+module = ["PyQt6.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "grd_generator.gui"
+disallow_subclassing_any = false
+warn_unused_ignores = false
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["src"]
@@ -52,6 +76,8 @@ branch = true
 omit = [
     "*/grd_generator/generate.py",       # script offline : orchestration + écriture .npz
     "*/grd_generator/calibrate.py",      # script offline : sampling + écriture .npz + CLI
+    "*/grd_generator/plot.py",           # rendu matplotlib : effets de bord graphiques
+    "*/grd_generator/gui.py",            # application Qt : effets de bord interface
     "*/grd_generator/examples/*",        # scripts d'exemple : testés en lancement
     "*/tests/*",
 ]

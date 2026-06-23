@@ -298,6 +298,36 @@ def envelope_min_dbi(
     return float(envelope[inside].min())
 
 
+def pattern_max_envelope_dbi(
+    specs: list[EllipticalSpec], grid: UVGrid, *, mode: str = "gaussian"
+) -> DirectivityMap:
+    """Enveloppe = **max sur les patterns** : `10·log10(maxᵢ|Eᵢ|²)` en dBi.
+
+    Le meilleur élément seul en chaque point (≠ `combined_max_directivity_dbi`,
+    qui est la somme RSS = plafond de combinaison cohérente).
+    """
+    power = np.maximum.reduce(
+        [np.abs(elliptical_field(s, grid, mode=mode)) ** 2 for s in specs]
+    )
+    dbi: DirectivityMap = (10.0 * np.log10(np.maximum(power, _FLOOR))).astype(np.float64)
+    return dbi
+
+
+def pattern_envelope_min_in_zone(
+    specs: list[EllipticalSpec],
+    grid: UVGrid,
+    zone_center: tuple[float, float],
+    zone_radius: float,
+    *,
+    mode: str = "gaussian",
+) -> float:
+    """Min de l'enveloppe max-sur-patterns dans le disque de service (couverture)."""
+    gu, gv = grid.meshgrid()
+    inside = (gu - zone_center[0]) ** 2 + (gv - zone_center[1]) ** 2 <= zone_radius**2
+    env = pattern_max_envelope_dbi(specs, grid, mode=mode)
+    return float(env[inside].min())
+
+
 def hex_centers_uv(
     zone_center: tuple[float, float],
     zone_radius: float,
@@ -410,4 +440,6 @@ __all__ = [
     "HALF_POWER_WIDTH_PER_SIGMA",
     "widths_to_sigmas",
     "elliptical_field",
+    "pattern_max_envelope_dbi",
+    "pattern_envelope_min_in_zone",
 ]

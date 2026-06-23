@@ -236,3 +236,50 @@ def test_elliptical_unknown_mode_raises() -> None:
     )
     with _pytest.raises(ValueError):
         elliptical_field(spec, _ellip_grid(), mode="nope")
+
+
+def test_pattern_max_envelope_single_spec_equals_directivity() -> None:
+    from grd_generator.schemas import EllipticalSpec
+    from grd_generator.synth import elliptical_field, pattern_max_envelope_dbi
+
+    grid = _ellip_grid()
+    spec = EllipticalSpec(
+        center_uv=(0.0, 0.0), sigma_major=0.3, sigma_minor=0.2, peak_gain_dbi=30.0
+    )
+    env = pattern_max_envelope_dbi([spec], grid)
+    field = elliptical_field(spec, grid)
+    expected = 10.0 * np.log10(np.maximum(np.abs(field) ** 2, 1e-12))
+    np.testing.assert_allclose(env, expected, rtol=1e-9)
+
+
+def test_pattern_max_envelope_takes_pointwise_max() -> None:
+    from grd_generator.schemas import EllipticalSpec
+    from grd_generator.synth import pattern_max_envelope_dbi
+
+    grid = _ellip_grid()
+    left = EllipticalSpec(
+        center_uv=(-0.4, 0.0), sigma_major=0.15, sigma_minor=0.15, peak_gain_dbi=30.0
+    )
+    right = EllipticalSpec(
+        center_uv=(0.4, 0.0), sigma_major=0.15, sigma_minor=0.15, peak_gain_dbi=30.0
+    )
+    env = pattern_max_envelope_dbi([left, right], grid)
+    # max over patterns: peak ≈ the stronger single element's peak (30 dBi)
+    assert env.max() == pytest.approx(30.0, abs=0.5)
+
+
+def test_pattern_envelope_min_in_zone_increases_with_sigma() -> None:
+    from grd_generator.schemas import EllipticalSpec
+    from grd_generator.synth import pattern_envelope_min_in_zone
+
+    grid = _ellip_grid()
+
+    def specs(s: float) -> list[EllipticalSpec]:
+        return [
+            EllipticalSpec(center_uv=(cu, 0.0), sigma_major=s, sigma_minor=s, peak_gain_dbi=30.0)
+            for cu in (-0.4, 0.0, 0.4)
+        ]
+
+    narrow = pattern_envelope_min_in_zone(specs(0.1), grid, (0.0, 0.0), 0.5)
+    wide = pattern_envelope_min_in_zone(specs(0.4), grid, (0.0, 0.0), 0.5)
+    assert wide > narrow  # des lobes plus larges couvrent mieux la zone
