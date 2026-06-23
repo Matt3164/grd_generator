@@ -255,9 +255,8 @@ class PatternStudio(QMainWindow):  # type: ignore[misc]
         self._axes = self._figure.subplots(2, 3).ravel()
         self._cb_dir = None
         self._cb_phase = None
-        # Projection sur Terre : repère NADIR (la grille est en repère nadir),
-        # borésight = (0, sat_lon) — pas le pointage antenne.
-        earth_kw: dict[str, float] = {"sat_lon": r.sat_lon, "b_lat": 0.0, "b_lon": r.sat_lon}
+        # Vues « Terre » = repère angulaire (u, v) à la longitude sat (vue satellite).
+        earth_kw: dict[str, float] = {"sat_lon": r.sat_lon}
         overlay_kw: dict[str, float] = {
             "zone_center": r.zone_center,  # type: ignore[dict-item]
             "zone_radius": r.zone_radius_deg,
@@ -271,7 +270,7 @@ class PatternStudio(QMainWindow):  # type: ignore[misc]
         draw_zone_and_antenna(self._axes[2], **earth_kw, **overlay_kw)  # type: ignore[arg-type]
         env_coherent = combined_max_directivity_dbi(list(r.fields))
         _draw_earth_envelope(self._axes[3], r.grid, env_coherent, **earth_kw)  # type: ignore[arg-type]
-        self._axes[3].set_title("Enveloppe Terre — combinaison cohérente")
+        self._axes[3].set_title("Enveloppe — vue satellite (combinaison cohérente)")
         draw_zone_and_antenna(self._axes[3], **earth_kw, **overlay_kw)  # type: ignore[arg-type]
         env_max = envelope_max_dbi(r.fields)
         draw_earth_envelope_contours(

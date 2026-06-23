@@ -18,7 +18,7 @@ def test_draw_earth_envelope_contours_renders(tmp_path: Path) -> None:
     grid, fields, _ = load_array(npz)
     env = envelope_max_dbi(fields)
     fig, ax = plt.subplots()
-    draw_earth_envelope_contours(ax, grid, env, sat_lon=3.0, b_lat=0.0, b_lon=3.0, step_db=5.0)
+    draw_earth_envelope_contours(ax, grid, env, sat_lon=3.0, step_db=5.0)
     out = tmp_path / "contours.png"
     fig.savefig(out)
     plt.close(fig)

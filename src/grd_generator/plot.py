@@ -1,19 +1,21 @@
-"""Rendu matplotlib d'un array généré (.npz) : direct (u, v), phase et sur Terre.
+"""Rendu matplotlib d'un array généré (.npz) : direct (u, v), phase et vue satellite.
 
 Six panneaux (grille 2×3) pour un `.npz` (référence ou calibré) :
   1. directivité d'un élément en espace angulaire (u, v),
   2. phase de cet élément (u, v),
   3. répartition des barycentres des patterns en (u, v),
   4. enveloppe = directivité **max sur tous les patterns** `10·log10(maxᵢ|Eᵢ|²)`,
-  5. cette enveloppe projetée sur la Terre, côtes Natural Earth (50 m) en fond,
-  6. barycentres des patterns projetés sur la Terre.
+  5. enveloppe sur la **vue satellite** (Terre vue du sat, repère (u, v) : disque
+     du limbe + côtes projetées), 6. barycentres + empreintes des patterns idem.
 
-Hors-ligne : les côtes sont lues depuis le GeoJSON vendored `data/ne_50m_land.geojson`
-(aucune dépendance réseau / cartopy). matplotlib est un extra optionnel `viz`.
+Les vues « Terre » sont dans le **repère angulaire de génération** (u, v) : la Terre
+y est un disque (limbe ≈ 8,7°), les côtes sont projetées en avant
+(`project_to_angular_masked`), et les données (u, v) sont tracées directement —
+aucune projection inverse. Côtes Natural Earth (50 m) vendored, hors-ligne.
 
 Usage :
     uv run grd-plot --npz data/processed/reference_array.npz
-    uv run grd-plot --npz data/processed/cal0000.npz --boresight-lat 46.6 --boresight-lon 2.5
+    uv run grd-plot --npz data/processed/cal0000.npz --sat-lon 3.0
 """
 
 import argparse
@@ -33,7 +35,11 @@ except ModuleNotFoundError as exc:  # pragma: no cover
         "(`uv sync --extra viz` ou `pip install 'grd_generator[viz]'`)."
     ) from exc
 
-from grd_generator.geometry import earth_intersection_latlon
+from grd_generator.geometry import (
+    earth_limb_angle_deg,
+    project_point,
+    project_to_angular_masked,
+)
 from grd_generator.logger import configure_logging, logger
 from grd_generator.schemas import UVGrid
 
@@ -143,68 +149,55 @@ def _draw_centers_uv(ax: Any, centers: NDArray[np.float64], peaks: NDArray[np.fl
     ax.figure.colorbar(sc, ax=ax, label="crête (dBi)", shrink=0.8)
 
 
-def _project(
-    u: NDArray[np.float64], v: NDArray[np.float64], sat_lon: float, b_lat: float, b_lon: float
-) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.bool_]]:
-    """Projette des directions (u, v) sur la Terre → (lat, lon, hit)."""
-    return earth_intersection_latlon(u, v, sat_lon, b_lat, b_lon)
-
-
-def _draw_coastlines(ax: Any, lon_lo: float, lon_hi: float, lat_lo: float, lat_hi: float) -> None:
-    """Trace les côtes et borne les axes à la fenêtre demandée."""
+def _draw_globe_base(ax: Any, *, sat_lon: float) -> None:
+    """Disque terrestre (limbe) + côtes projetées en (u, v) — vue satellite (nadir)."""
+    limb = earth_limb_angle_deg()
+    theta = np.linspace(0.0, 2.0 * np.pi, 361)
+    ax.plot(limb * np.cos(theta), limb * np.sin(theta), color="0.2", linewidth=1.0)
     for ring in coastline_rings():
-        ax.plot(ring[:, 0], ring[:, 1], color="0.35", linewidth=0.4)
-    ax.set_xlim(max(-180.0, lon_lo), min(180.0, lon_hi))
-    ax.set_ylim(max(-90.0, lat_lo), min(90.0, lat_hi))
+        u, v = project_to_angular_masked(ring[:, 1], ring[:, 0], sat_lon, 0.0, sat_lon)
+        ax.plot(u, v, color="0.55", linewidth=0.4)
+    margin = limb + 0.5
+    ax.set_xlim(-margin, margin)
+    ax.set_ylim(-margin, margin)
     ax.set_aspect("equal")
-    ax.set_xlabel("longitude (deg)")
-    ax.set_ylabel("latitude (deg)")
-
-
-def _draw_earth_envelope(
-    ax: Any, grid: UVGrid, envelope_dbi: NDArray[np.float64], *, sat_lon: float,
-    b_lat: float, b_lon: float,
-) -> None:
-    """Enveloppe projetée sur la Terre (lat, lon), côtes en fond."""
-    gu, gv = grid.meshgrid()
-    lat, lon, hit = _project(gu, gv, sat_lon, b_lat, b_lon)
-    hit_lon, hit_lat, hit_dbi = lon[hit], lat[hit], envelope_dbi[hit]
-    if hit_dbi.size:
-        vmax = float(hit_dbi.max())
-        sc = ax.scatter(
-            hit_lon, hit_lat, c=hit_dbi, s=6, cmap="viridis",
-            vmin=vmax - _DYN_RANGE_DB, vmax=vmax,
-        )
-        ax.figure.colorbar(sc, ax=ax, label="dBi", shrink=0.8)
-        pad = 5.0
-        win = (
-            float(hit_lon.min()) - pad, float(hit_lon.max()) + pad,
-            float(hit_lat.min()) - pad, float(hit_lat.max()) + pad,
-        )
-    else:  # pragma: no cover
-        win = (-180.0, 180.0, -90.0, 90.0)
-    _draw_coastlines(ax, *win)
-    ax.set_title("Enveloppe sur Terre")
+    ax.set_xlabel("u (deg)")
+    ax.set_ylabel("v (deg)")
 
 
 def draw_zone_and_antenna(
     ax: Any,
     *,
     sat_lon: float,
-    b_lat: float,
-    b_lon: float,
     zone_center: tuple[float, float],
     zone_radius: float,
     antenna_lat: float,
     antenna_lon: float,
 ) -> None:
-    """Superpose le disque de zone (cercle projeté) et le pointage antenne (étoile)."""
+    """Disque de zone (cercle u, v) + pointage antenne (étoile, direction projetée)."""
     theta = np.linspace(0.0, 2.0 * np.pi, 181)
-    cu = zone_center[0] + zone_radius * np.cos(theta)
-    cv = zone_center[1] + zone_radius * np.sin(theta)
-    lat, lon, hit = _project(cu, cv, sat_lon, b_lat, b_lon)
-    ax.plot(lon[hit], lat[hit], color="red", linewidth=1.3)
-    ax.plot([antenna_lon], [antenna_lat], marker="*", color="red", markersize=13, linestyle="")
+    ax.plot(
+        zone_center[0] + zone_radius * np.cos(theta),
+        zone_center[1] + zone_radius * np.sin(theta),
+        color="red",
+        linewidth=1.3,
+    )
+    au, av = project_point(antenna_lat, antenna_lon, sat_lon, 0.0, sat_lon)
+    ax.plot([au], [av], marker="*", color="red", markersize=13, linestyle="")
+
+
+def _draw_earth_envelope(
+    ax: Any, grid: UVGrid, envelope_dbi: NDArray[np.float64], *, sat_lon: float
+) -> None:
+    """Enveloppe (dBi) sur la vue satellite (u, v), disque + côtes en fond."""
+    gu, gv = grid.meshgrid()
+    vmax = float(envelope_dbi.max())
+    mesh = ax.pcolormesh(
+        gu, gv, envelope_dbi, shading="auto", cmap="viridis", vmin=vmax - _DYN_RANGE_DB, vmax=vmax
+    )
+    ax.figure.colorbar(mesh, ax=ax, label="dBi", shrink=0.8)
+    _draw_globe_base(ax, sat_lon=sat_lon)
+    ax.set_title("Enveloppe — vue satellite")
 
 
 def draw_earth_pattern_footprints(
@@ -214,50 +207,17 @@ def draw_earth_pattern_footprints(
     centers: NDArray[np.float64],
     *,
     sat_lon: float,
-    b_lat: float,
-    b_lon: float,
     drop_db: float = 1.0,
 ) -> None:
-    """Barycentres + empreinte `−drop_db` dB (du max de chaque pattern) sur la Terre."""
+    """Barycentres + empreinte `−drop_db` dB (du max de chaque pattern), vue satellite."""
     gu, gv = grid.meshgrid()
-    lat, lon, hit = _project(gu, gv, sat_lon, b_lat, b_lon)
-    lon_fill = np.where(hit, lon, float(np.mean(lon[hit])))
-    lat_fill = np.where(hit, lat, float(np.mean(lat[hit])))
     for field in fields:
         dbi = 10.0 * np.log10(np.maximum(np.abs(field) ** 2, _FLOOR))
         level = float(dbi.max()) - drop_db
-        z = np.ma.masked_invalid(np.where(hit, dbi, np.nan))
-        ax.contour(lon_fill, lat_fill, z, levels=[level], colors="0.5", linewidths=0.4)
-    clat, clon, chit = _project(centers[:, 0], centers[:, 1], sat_lon, b_lat, b_lon)
-    ax.plot(clon[chit], clat[chit], marker=".", color="C0", markersize=4, linestyle="")
-    pad = 5.0
-    win = (
-        float(lon[hit].min()) - pad, float(lon[hit].max()) + pad,
-        float(lat[hit].min()) - pad, float(lat[hit].max()) + pad,
-    )
-    _draw_coastlines(ax, *win)
-    ax.set_title(f"Patterns sur Terre — barycentres + empreintes −{drop_db:g} dB")
-
-
-def _draw_earth_centers(
-    ax: Any, centers: NDArray[np.float64], peaks: NDArray[np.float64], *, sat_lon: float,
-    b_lat: float, b_lon: float,
-) -> None:
-    """Barycentres des patterns projetés sur la Terre, côtes en fond."""
-    lat, lon, hit = _project(centers[:, 0], centers[:, 1], sat_lon, b_lat, b_lon)
-    hit_lon, hit_lat, hit_peaks = lon[hit], lat[hit], peaks[hit]
-    if hit_lon.size:
-        sc = ax.scatter(hit_lon, hit_lat, c=hit_peaks, s=18, cmap="plasma")
-        ax.figure.colorbar(sc, ax=ax, label="crête (dBi)", shrink=0.8)
-        pad = 5.0
-        win = (
-            float(hit_lon.min()) - pad, float(hit_lon.max()) + pad,
-            float(hit_lat.min()) - pad, float(hit_lat.max()) + pad,
-        )
-    else:  # pragma: no cover
-        win = (-180.0, 180.0, -90.0, 90.0)
-    _draw_coastlines(ax, *win)
-    ax.set_title(f"Barycentres sur Terre ({len(centers)})")
+        ax.contour(gu, gv, dbi, levels=[level], colors="0.5", linewidths=0.4)
+    ax.plot(centers[:, 0], centers[:, 1], marker=".", color="C0", markersize=4, linestyle="")
+    _draw_globe_base(ax, sat_lon=sat_lon)
+    ax.set_title(f"Patterns — vue satellite (barycentres + empreintes −{drop_db:g} dB)")
 
 
 def draw_earth_envelope_contours(
@@ -266,33 +226,16 @@ def draw_earth_envelope_contours(
     envelope_dbi: NDArray[np.float64],
     *,
     sat_lon: float,
-    b_lat: float,
-    b_lon: float,
     step_db: float = 5.0,
 ) -> None:
-    """Enveloppe max projetée sur la Terre en isolignes (tous les `step_db` dB)."""
+    """Enveloppe en isolignes (tous les `step_db` dB) sur la vue satellite (u, v)."""
     gu, gv = grid.meshgrid()
-    lat, lon, hit = _project(gu, gv, sat_lon, b_lat, b_lon)
-    if not np.any(hit):  # pragma: no cover
-        _draw_coastlines(ax, -180.0, 180.0, -90.0, 90.0)
-        ax.set_title("Enveloppe sur Terre — isolignes")
-        return
-    z = np.ma.masked_invalid(np.where(hit, envelope_dbi, np.nan))
-    # contour exige des coordonnées finies ; les cellules hors-disque (Z masqué)
-    # ne sont pas tracées, donc leur coordonnée de remplissage est sans effet.
-    lon_fill = np.where(hit, lon, float(np.mean(lon[hit])))
-    lat_fill = np.where(hit, lat, float(np.mean(lat[hit])))
-    vmax = float(np.max(envelope_dbi[hit]))
+    vmax = float(envelope_dbi.max())
     levels = np.arange(vmax - _DYN_RANGE_DB, vmax + step_db, step_db)
-    cs = ax.contour(lon_fill, lat_fill, z, levels=levels, cmap="viridis")
+    cs = ax.contour(gu, gv, envelope_dbi, levels=levels, cmap="viridis")
     ax.clabel(cs, inline=True, fontsize=7, fmt="%.0f")
-    pad = 5.0
-    win = (
-        float(lon[hit].min()) - pad, float(lon[hit].max()) + pad,
-        float(lat[hit].min()) - pad, float(lat[hit].max()) + pad,
-    )
-    _draw_coastlines(ax, *win)
-    ax.set_title(f"Enveloppe sur Terre — isolignes ({int(step_db)} dB)")
+    _draw_globe_base(ax, sat_lon=sat_lon)
+    ax.set_title(f"Enveloppe — vue satellite, isolignes ({step_db:g} dB)")
 
 
 def render(
@@ -301,19 +244,16 @@ def render(
     out: str | Path | None = None,
     element: int = 0,
     sat_lon: float = 3.0,
-    boresight_lat: float = 0.0,
-    boresight_lon: float | None = None,
     show: bool = True,
 ) -> Path:
-    """Trace 6 panneaux (directivité, phase, barycentres, enveloppe, Terre) ; écrit un PNG.
+    """Trace 6 panneaux (directivité, phase, barycentres, enveloppe, vue sat) ; écrit un PNG.
 
-    `boresight_lon` défaut = `sat_lon` (visée nadir). `out` défaut = `<npz>.png`.
+    Les vues « Terre » sont en repère angulaire (u, v) à la longitude `sat_lon`.
+    `out` défaut = `<npz>.png`.
     """
     grid, fields, centers_uv = load_array(npz_path)
     if not 0 <= element < len(fields):
         raise IndexError(f"élément {element} hors plage (0..{len(fields) - 1})")
-    if boresight_lon is None:
-        boresight_lon = sat_lon
 
     centers = element_centers(grid, fields, centers_uv)
     peaks = element_peaks_dbi(fields)
@@ -325,12 +265,8 @@ def render(
     _draw_phase_map(axes[0, 1], grid, fields[element], f"Élément #{element} — phase")
     _draw_centers_uv(axes[0, 2], centers, peaks)
     _draw_uv_map(axes[1, 0], grid, envelope_dbi, f"Enveloppe — max sur {len(fields)} patterns")
-    _draw_earth_envelope(
-        axes[1, 1], grid, envelope_dbi, sat_lon=sat_lon, b_lat=boresight_lat, b_lon=boresight_lon
-    )
-    _draw_earth_centers(
-        axes[1, 2], centers, peaks, sat_lon=sat_lon, b_lat=boresight_lat, b_lon=boresight_lon
-    )
+    _draw_earth_envelope(axes[1, 1], grid, envelope_dbi, sat_lon=sat_lon)
+    draw_earth_pattern_footprints(axes[1, 2], grid, fields, centers, sat_lon=sat_lon)
     fig.suptitle(Path(npz_path).name)
     fig.tight_layout()
 
@@ -351,10 +287,6 @@ def main() -> None:
     parser.add_argument("--out", default=None, help="PNG de sortie (défaut : <npz>.png)")
     parser.add_argument("--element", type=int, default=0, help="indice de l'élément tracé")
     parser.add_argument("--sat-lon", type=float, default=3.0, help="longitude du GEO (deg)")
-    parser.add_argument("--boresight-lat", type=float, default=0.0, help="latitude de visée (deg)")
-    parser.add_argument(
-        "--boresight-lon", type=float, default=None, help="longitude de visée (défaut : sat-lon)"
-    )
     parser.add_argument("--no-show", action="store_true", help="ne pas ouvrir de fenêtre")
     args = parser.parse_args()
     render(
@@ -362,8 +294,6 @@ def main() -> None:
         out=args.out,
         element=args.element,
         sat_lon=args.sat_lon,
-        boresight_lat=args.boresight_lat,
-        boresight_lon=args.boresight_lon,
         show=not args.no_show,
     )
 
