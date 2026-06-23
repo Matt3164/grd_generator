@@ -272,7 +272,7 @@ class PatternStudio(QMainWindow):  # type: ignore[misc]
         draw_zone_and_antenna(self._axes[3], **earth_kw, **overlay_kw)  # type: ignore[arg-type]
         env_max = envelope_max_dbi(r.fields)
         draw_earth_envelope_contours(
-            self._axes[4], r.grid, env_max, **earth_kw  # type: ignore[arg-type]
+            self._axes[4], r.grid, env_max, step_db=1.0, **earth_kw  # type: ignore[arg-type]
         )
         draw_zone_and_antenna(self._axes[4], **earth_kw, **overlay_kw)  # type: ignore[arg-type]
         self._axes[5].axis("off")
