@@ -107,8 +107,8 @@ def element_peaks_dbi(fields: NDArray[np.complex128]) -> NDArray[np.float64]:
     return np.asarray(peaks, dtype=np.float64)
 
 
-def _draw_uv_map(ax: Any, grid: UVGrid, dbi: NDArray[np.float64], title: str) -> None:
-    """Carte de directivité (dBi) en espace angulaire (u, v)."""
+def _draw_uv_map(ax: Any, grid: UVGrid, dbi: NDArray[np.float64], title: str) -> Any:
+    """Carte de directivité (dBi) en (u, v). Renvoie la colorbar (à retirer au redraw)."""
     gu, gv = grid.meshgrid()
     vmax = float(dbi.max())
     mesh = ax.pcolormesh(
@@ -118,11 +118,11 @@ def _draw_uv_map(ax: Any, grid: UVGrid, dbi: NDArray[np.float64], title: str) ->
     ax.set_xlabel("u (deg)")
     ax.set_ylabel("v (deg)")
     ax.set_title(title)
-    ax.figure.colorbar(mesh, ax=ax, label="dBi", shrink=0.8)
+    return ax.figure.colorbar(mesh, ax=ax, label="dBi", shrink=0.8)
 
 
-def _draw_phase_map(ax: Any, grid: UVGrid, field: NDArray[np.complex128], title: str) -> None:
-    """Carte de phase (rad, −π..π) du champ complexe en (u, v)."""
+def _draw_phase_map(ax: Any, grid: UVGrid, field: NDArray[np.complex128], title: str) -> Any:
+    """Carte de phase (rad, −π..π) en (u, v). Renvoie la colorbar (à retirer au redraw)."""
     gu, gv = grid.meshgrid()
     phase = np.angle(field)
     mesh = ax.pcolormesh(gu, gv, phase, shading="auto", cmap="twilight", vmin=-np.pi, vmax=np.pi)
@@ -130,7 +130,7 @@ def _draw_phase_map(ax: Any, grid: UVGrid, field: NDArray[np.complex128], title:
     ax.set_xlabel("u (deg)")
     ax.set_ylabel("v (deg)")
     ax.set_title(title)
-    ax.figure.colorbar(mesh, ax=ax, label="phase (rad)", shrink=0.8)
+    return ax.figure.colorbar(mesh, ax=ax, label="phase (rad)", shrink=0.8)
 
 
 def _draw_centers_uv(ax: Any, centers: NDArray[np.float64], peaks: NDArray[np.float64]) -> None:
@@ -185,6 +185,58 @@ def _draw_earth_envelope(
         win = (-180.0, 180.0, -90.0, 90.0)
     _draw_coastlines(ax, *win)
     ax.set_title("Enveloppe sur Terre")
+
+
+def draw_zone_and_antenna(
+    ax: Any,
+    *,
+    sat_lon: float,
+    b_lat: float,
+    b_lon: float,
+    zone_center: tuple[float, float],
+    zone_radius: float,
+    antenna_lat: float,
+    antenna_lon: float,
+) -> None:
+    """Superpose le disque de zone (cercle projeté) et le pointage antenne (étoile)."""
+    theta = np.linspace(0.0, 2.0 * np.pi, 181)
+    cu = zone_center[0] + zone_radius * np.cos(theta)
+    cv = zone_center[1] + zone_radius * np.sin(theta)
+    lat, lon, hit = _project(cu, cv, sat_lon, b_lat, b_lon)
+    ax.plot(lon[hit], lat[hit], color="red", linewidth=1.3)
+    ax.plot([antenna_lon], [antenna_lat], marker="*", color="red", markersize=13, linestyle="")
+
+
+def draw_earth_pattern_footprints(
+    ax: Any,
+    grid: UVGrid,
+    fields: NDArray[np.complex128],
+    centers: NDArray[np.float64],
+    *,
+    sat_lon: float,
+    b_lat: float,
+    b_lon: float,
+    drop_db: float = 1.0,
+) -> None:
+    """Barycentres + empreinte `−drop_db` dB (du max de chaque pattern) sur la Terre."""
+    gu, gv = grid.meshgrid()
+    lat, lon, hit = _project(gu, gv, sat_lon, b_lat, b_lon)
+    lon_fill = np.where(hit, lon, float(np.mean(lon[hit])))
+    lat_fill = np.where(hit, lat, float(np.mean(lat[hit])))
+    for field in fields:
+        dbi = 10.0 * np.log10(np.maximum(np.abs(field) ** 2, _FLOOR))
+        level = float(dbi.max()) - drop_db
+        z = np.ma.masked_invalid(np.where(hit, dbi, np.nan))
+        ax.contour(lon_fill, lat_fill, z, levels=[level], colors="0.5", linewidths=0.4)
+    clat, clon, chit = _project(centers[:, 0], centers[:, 1], sat_lon, b_lat, b_lon)
+    ax.plot(clon[chit], clat[chit], marker=".", color="C0", markersize=4, linestyle="")
+    pad = 5.0
+    win = (
+        float(lon[hit].min()) - pad, float(lon[hit].max()) + pad,
+        float(lat[hit].min()) - pad, float(lat[hit].max()) + pad,
+    )
+    _draw_coastlines(ax, *win)
+    ax.set_title(f"Patterns sur Terre — barycentres + empreintes −{drop_db:g} dB")
 
 
 def _draw_earth_centers(
