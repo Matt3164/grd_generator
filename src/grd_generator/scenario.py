@@ -29,15 +29,15 @@ class Scenario:
     name: str
     sat_lon_deg: float  # longitude orbitale du GEO
     antenna_latlon: tuple[float, float]  # visée de l'antenne (lat, lon)
-    zone_radius_deg: float = 6.0  # rayon de la zone de service (min réglementaire 6°)
+    zone_radius_deg: float = 6.0  # rayon de la zone de service (°), > 0 ; doit tenir sous le limbe
     limb_margin_deg: float = 0.2  # marge gardant la zone strictement sous le limbe
 
     def __post_init__(self) -> None:
-        """Échoue tôt sur un scénario mal formé."""
-        if self.zone_radius_deg < 6.0:
+        """Échoue tôt sur un rayon non physique (la tenue sous le limbe est vérifiée
+        par `sat_frame_geometry`, qui connaît la géométrie)."""
+        if self.zone_radius_deg <= 0.0:
             raise ValueError(
-                f"scénario {self.name!r} : zone_radius_deg={self.zone_radius_deg} "
-                f"sous le minimum réglementaire de 6°"
+                f"scénario {self.name!r} : zone_radius_deg={self.zone_radius_deg} doit être > 0"
             )
 
 

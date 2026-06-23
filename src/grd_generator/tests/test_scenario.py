@@ -14,9 +14,15 @@ def test_france_defaults() -> None:
     assert FRANCE.limb_margin_deg == 0.2
 
 
-def test_scenario_rejects_subregulatory_radius() -> None:
+def test_scenario_rejects_non_positive_radius() -> None:
     with pytest.raises(ValueError):
-        Scenario(name="x", sat_lon_deg=0.0, antenna_latlon=(0.0, 0.0), zone_radius_deg=5.0)
+        Scenario(name="x", sat_lon_deg=0.0, antenna_latlon=(0.0, 0.0), zone_radius_deg=0.0)
+
+
+def test_scenario_accepts_small_positive_radius() -> None:
+    # plus de plancher réglementaire de 6° : un petit rayon physique est valide
+    sc = Scenario(name="x", sat_lon_deg=0.0, antenna_latlon=(0.0, 0.0), zone_radius_deg=2.0)
+    assert sc.zone_radius_deg == 2.0
 
 
 def test_sat_frame_geometry_zone_under_limb() -> None:

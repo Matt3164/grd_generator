@@ -37,6 +37,7 @@ from grd_generator.calibrate import (
     calibrate,
     write_calibrated,
 )
+from grd_generator.geometry import earth_limb_angle_deg
 from grd_generator.logger import configure_logging, logger
 from grd_generator.plot import (
     _draw_earth_envelope,
@@ -137,7 +138,9 @@ class PatternStudio(QMainWindow):  # type: ignore[misc]
         self._lat = self._dspin(-90.0, 90.0, 46.6, 0.1)
         self._lon = self._dspin(-180.0, 180.0, 2.5, 0.1)
         self._sat_lon = self._dspin(-180.0, 180.0, 3.0, 0.1)
-        self._zone = self._dspin(6.0, 9.0, 6.0, 0.5)
+        # bornes physiques : rayon > 0 et ≤ limbe − marge (sinon hors du disque terrestre)
+        zone_max = round(earth_limb_angle_deg() - 0.2, 2)
+        self._zone = self._dspin(0.5, zone_max, 6.0, 0.5)
         self._report = QComboBox()
         for d in sorted(p.name for p in reports_dir.iterdir() if (p / "report.json").exists()):
             self._report.addItem(d)
