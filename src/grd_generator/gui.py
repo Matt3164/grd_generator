@@ -37,21 +37,21 @@ from grd_generator.calibrate import (
     calibrate,
     write_calibrated,
 )
+from grd_generator.geometry import earth_limb_angle_deg
 from grd_generator.logger import configure_logging, logger
 from grd_generator.plot import (
-    _draw_centers_uv,
     _draw_earth_envelope,
     _draw_phase_map,
     _draw_uv_map,
     draw_earth_envelope_contours,
-    element_centers,
-    element_peaks_dbi,
+    draw_earth_pattern_footprints,
+    draw_zone_and_antenna,
     envelope_max_dbi,
 )
 from grd_generator.report_ingest import read_report
-from grd_generator.scenario import Scenario
+from grd_generator.scenario import Scenario, sat_frame_geometry
 from grd_generator.schemas import EllipticalSpec, UVGrid
-from grd_generator.synth import elliptical_field
+from grd_generator.synth import combined_max_directivity_dbi, elliptical_field
 
 REPORTS_DIR = Path(__file__).resolve().parents[2] / "data" / "reference_reports"
 
@@ -66,6 +66,10 @@ class CalibrationResult:
     peaks_dbi: NDArray[np.float64]
     mode: str
     specs: list[EllipticalSpec]
+    sat_lon: float
+    zone_center: tuple[float, float]
+    zone_radius_deg: float
+    antenna_latlon: tuple[float, float]
 
 
 def build_result(
@@ -89,6 +93,7 @@ def build_result(
         zone_radius_deg=zone_radius_deg,
     )
     stats = read_report(report_path)
+    geo = sat_frame_geometry(scenario, n_u=n_u, n_v=n_v)
     specs, grid = calibrate(
         stats,
         scenario=scenario,
@@ -102,7 +107,16 @@ def build_result(
     centers = np.array([s.center_uv for s in specs], dtype=float)
     peaks = np.array([s.peak_gain_dbi for s in specs], dtype=float)
     return CalibrationResult(
-        grid=grid, fields=fields, centers_uv=centers, peaks_dbi=peaks, mode=stats.mode, specs=specs
+        grid=grid,
+        fields=fields,
+        centers_uv=centers,
+        peaks_dbi=peaks,
+        mode=stats.mode,
+        specs=specs,
+        sat_lon=sat_lon,
+        zone_center=geo.zone_center,
+        zone_radius_deg=geo.zone_radius_deg,
+        antenna_latlon=(antenna_lat, antenna_lon),
     )
 
 
@@ -118,11 +132,15 @@ class PatternStudio(QMainWindow):  # type: ignore[misc]
         self._n_v = n_v
         self._result: CalibrationResult | None = None
         self._axes: Any = None  # tableau d'axes matplotlib, peuplé par _redraw_all
+        self._cb_dir: Any = None  # colorbar directivité (retirée au redraw)
+        self._cb_phase: Any = None  # colorbar phase (retirée au redraw)
 
         self._lat = self._dspin(-90.0, 90.0, 46.6, 0.1)
         self._lon = self._dspin(-180.0, 180.0, 2.5, 0.1)
         self._sat_lon = self._dspin(-180.0, 180.0, 3.0, 0.1)
-        self._zone = self._dspin(6.0, 9.0, 6.0, 0.5)
+        # bornes physiques : rayon > 0 et ≤ limbe − marge (sinon hors du disque terrestre)
+        zone_max = round(earth_limb_angle_deg() - 0.2, 2)
+        self._zone = self._dspin(0.5, zone_max, 6.0, 0.5)
         self._report = QComboBox()
         for d in sorted(p.name for p in reports_dir.iterdir() if (p / "report.json").exists()):
             self._report.addItem(d)
@@ -235,14 +253,31 @@ class PatternStudio(QMainWindow):  # type: ignore[misc]
         r = self._result
         self._figure.clear()
         self._axes = self._figure.subplots(2, 3).ravel()
-        centers = element_centers(r.grid, r.fields, r.centers_uv)
-        peaks = element_peaks_dbi(r.fields)
-        _draw_centers_uv(self._axes[0], centers, peaks)
+        self._cb_dir = None
+        self._cb_phase = None
+        # Projection sur Terre : repère NADIR (la grille est en repère nadir),
+        # borésight = (0, sat_lon) — pas le pointage antenne.
+        earth_kw: dict[str, float] = {"sat_lon": r.sat_lon, "b_lat": 0.0, "b_lon": r.sat_lon}
+        overlay_kw: dict[str, float] = {
+            "zone_center": r.zone_center,  # type: ignore[dict-item]
+            "zone_radius": r.zone_radius_deg,
+            "antenna_lat": r.antenna_latlon[0],
+            "antenna_lon": r.antenna_latlon[1],
+        }
         self._draw_element(self._element.value(), clear=False)
-        env = envelope_max_dbi(r.fields)
-        kw = dict(sat_lon=self._sat_lon.value(), b_lat=self._lat.value(), b_lon=self._lon.value())
-        _draw_earth_envelope(self._axes[3], r.grid, env, **kw)  # type: ignore[arg-type]
-        draw_earth_envelope_contours(self._axes[4], r.grid, env, **kw)  # type: ignore[arg-type]
+        draw_earth_pattern_footprints(
+            self._axes[2], r.grid, r.fields, r.centers_uv, **earth_kw  # type: ignore[arg-type]
+        )
+        draw_zone_and_antenna(self._axes[2], **earth_kw, **overlay_kw)  # type: ignore[arg-type]
+        env_coherent = combined_max_directivity_dbi(list(r.fields))
+        _draw_earth_envelope(self._axes[3], r.grid, env_coherent, **earth_kw)  # type: ignore[arg-type]
+        self._axes[3].set_title("Enveloppe Terre — combinaison cohérente")
+        draw_zone_and_antenna(self._axes[3], **earth_kw, **overlay_kw)  # type: ignore[arg-type]
+        env_max = envelope_max_dbi(r.fields)
+        draw_earth_envelope_contours(
+            self._axes[4], r.grid, env_max, step_db=1.0, **earth_kw  # type: ignore[arg-type]
+        )
+        draw_zone_and_antenna(self._axes[4], **earth_kw, **overlay_kw)  # type: ignore[arg-type]
         self._axes[5].axis("off")
         self._figure.tight_layout()
         self._canvas.draw_idle()  # type: ignore[no-untyped-call]
@@ -253,10 +288,15 @@ class PatternStudio(QMainWindow):  # type: ignore[misc]
         field = r.fields[idx]
         dbi = 10.0 * np.log10(np.maximum(np.abs(field) ** 2, 1e-12))
         if clear:
+            # Retirer les colorbars précédentes (sinon elles s'accumulent au redraw).
+            if self._cb_dir is not None:
+                self._cb_dir.remove()
+            if self._cb_phase is not None:
+                self._cb_phase.remove()
+            self._axes[0].clear()
             self._axes[1].clear()
-            self._axes[2].clear()
-        _draw_uv_map(self._axes[1], r.grid, dbi, f"Élément #{idx} — directivité")
-        _draw_phase_map(self._axes[2], r.grid, field, f"Élément #{idx} — phase")
+        self._cb_dir = _draw_uv_map(self._axes[0], r.grid, dbi, f"Élément #{idx} — directivité")
+        self._cb_phase = _draw_phase_map(self._axes[1], r.grid, field, f"Élément #{idx} — phase")
 
     def _on_generate(self) -> None:
         self.generate()
