@@ -9,6 +9,7 @@ import argparse
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
@@ -116,6 +117,7 @@ class PatternStudio(QMainWindow):  # type: ignore[misc]
         self._n_u = n_u
         self._n_v = n_v
         self._result: CalibrationResult | None = None
+        self._axes: Any = None  # tableau d'axes matplotlib, peuplé par _redraw_all
 
         self._lat = self._dspin(-90.0, 90.0, 46.6, 0.1)
         self._lon = self._dspin(-180.0, 180.0, 2.5, 0.1)
@@ -129,7 +131,7 @@ class PatternStudio(QMainWindow):  # type: ignore[misc]
         self._seed = self._ispin(0, 10_000, 0)
         self._margin = self._dspin(0.0, 30.0, DEFAULT_COVERAGE_MARGIN_DB, 0.5)
         self._element = self._ispin(0, 0, 0)
-        self._element.valueChanged.connect(lambda i: self.set_element(i))
+        self._element.valueChanged.connect(self.set_element)
 
         gen_btn = QPushButton("Générer")
         gen_btn.clicked.connect(self._on_generate)
