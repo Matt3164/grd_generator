@@ -35,6 +35,7 @@ except ModuleNotFoundError as exc:  # pragma: no cover
 
 from grd_generator.geometry import earth_intersection_latlon
 from grd_generator.logger import configure_logging, logger
+from grd_generator.reflector.zone import ServiceZone
 from grd_generator.schemas import UVGrid
 
 _LAND_GEOJSON = Path(__file__).resolve().parents[2] / "data" / "ne_50m_land.geojson"
@@ -293,6 +294,12 @@ def draw_earth_envelope_contours(
     )
     _draw_coastlines(ax, *win)
     ax.set_title(f"Enveloppe sur Terre — isolignes ({int(step_db)} dB)")
+
+
+def draw_service_zone_uv(ax: Any, zone: ServiceZone, *, color: str = "w", lw: float = 1.5) -> None:
+    """Trace le contour du disque de zone de service sur des axes (u, v)."""
+    u, v = zone.boundary_uv()
+    ax.plot(u, v, color=color, lw=lw, ls="--", label="zone de service")
 
 
 def render(
