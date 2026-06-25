@@ -20,11 +20,11 @@ def far_field_fft(
 ) -> tuple[ComplexArray, FloatArray, FloatArray]:
     """TF 2D centrée du champ d'ouverture → (F, L, M) en cosinus directeurs."""
     n = aperture.shape[0]
-    spec = np.fft.fftshift(np.fft.fft2(np.fft.ifftshift(aperture)))
+    ff = np.fft.fftshift(np.fft.fft2(np.fft.ifftshift(aperture)))
     freq = np.fft.fftshift(np.fft.fftfreq(n, d=dx))  # cycles/m
     lin = wavelength_m * freq  # cosinus directeur l = λ·fx
     L, M = np.meshgrid(lin, lin)
-    return spec.astype(np.complex128), L, M
+    return ff.astype(np.complex128), L, M
 
 
 def normalize_to_directivity(
@@ -57,7 +57,10 @@ def _bilinear(
     lq: FloatArray,
     mq: FloatArray,
 ) -> ComplexArray:
-    """Interpolation bilinéaire de `values` (grille régulière `axis`×`axis`)."""
+    """Interpolation bilinéaire de `values` (grille régulière `axis`×`axis`).
+
+    Assumes same axis for both dimensions; clamps queries to edge cells.
+    """
     ix = np.clip(np.searchsorted(axis, lq) - 1, 0, axis.size - 2)
     iy = np.clip(np.searchsorted(axis, mq) - 1, 0, axis.size - 2)
     x0, x1 = axis[ix], axis[ix + 1]

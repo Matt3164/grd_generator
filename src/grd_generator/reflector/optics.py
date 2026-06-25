@@ -71,7 +71,7 @@ def aperture_pol_vectors(
     ny = -Y / (2.0 * f)
     nz = np.ones_like(X)
     norm = np.sqrt(nx**2 + ny**2 + nz**2)
-    nx, ny, nz = nx / norm, ny / norm, nz / norm
+    nx, ny = nx / norm, ny / norm
     ndotx = nx  # n̂ · x̂
     ex: FloatArray = 2.0 * ndotx * nx - 1.0
     ey: FloatArray = 2.0 * ndotx * ny
