@@ -522,8 +522,20 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
 def main() -> None:  # pragma: no cover
     configure_logging()
     parser = argparse.ArgumentParser(description="Studio interactif de calibration de patterns.")
-    parser.parse_args()
+    parser.add_argument(
+        "--mode",
+        choices=["pattern", "reflector"],
+        default="pattern",
+        help=(
+            "Mode de lancement : 'pattern' (défaut) → PatternStudio ;"
+            " 'reflector' → ReflectorStudio (AFR)."
+        ),
+    )
+    args = parser.parse_args()
     app = QApplication.instance() or QApplication(sys.argv)
-    studio = PatternStudio()
+    if args.mode == "reflector":
+        studio: QMainWindow = ReflectorStudio()
+    else:
+        studio = PatternStudio()
     studio.show()
     app.exec()
