@@ -33,3 +33,20 @@ def test_aperture_field_uniform_when_q0_and_centered_feed() -> None:
     # q=0 → cos^0 = 1 inside; centered feed → zero phase tilt → real & flat.
     assert np.allclose(field[inside], 1.0)
     assert np.allclose(field[~inside], 0.0)
+
+
+def test_pol_vectors_pure_copol_on_axis() -> None:
+    spec = _spec()
+    X = np.array([[0.0]])
+    Y = np.array([[0.0]])
+    ex, ey = optics.aperture_pol_vectors(spec, X, Y)
+    assert abs(ey[0, 0]) < 1e-12          # no cross-pol on axis
+    assert abs(abs(ex[0, 0]) - 1.0) < 1e-12
+
+
+def test_pol_vectors_cross_in_diagonal() -> None:
+    spec = _spec()
+    X = np.array([[0.4]])
+    Y = np.array([[0.4]])
+    ex, ey = optics.aperture_pol_vectors(spec, X, Y)
+    assert abs(ey[0, 0]) > 1e-6           # diagonal region → cross-pol present

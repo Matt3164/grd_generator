@@ -56,3 +56,23 @@ def aperture_field(
     tilt = -k * spec.beam_deviation_factor * (dxf * X + dyf * Y) / spec.focal_length_m
     field: ComplexArray = (inside * amp * np.exp(1j * tilt)).astype(np.complex128)
     return field
+
+
+def aperture_pol_vectors(
+    spec: ReflectorSpec, X: FloatArray, Y: FloatArray
+) -> tuple[FloatArray, FloatArray]:
+    """Composantes (ex, ey) du vecteur de polarisation réfléchi (feed x-polarisé).
+
+    Réflexion GO de x̂ sur la normale du paraboloïde : e_r = 2(n̂·x̂)n̂ − x̂.
+    Source géométrique de la cross-pol (offset / plans diagonaux).
+    """
+    f = spec.focal_length_m
+    nx = -X / (2.0 * f)
+    ny = -Y / (2.0 * f)
+    nz = np.ones_like(X)
+    norm = np.sqrt(nx**2 + ny**2 + nz**2)
+    nx, ny, nz = nx / norm, ny / norm, nz / norm
+    ndotx = nx  # n̂ · x̂
+    ex: FloatArray = 2.0 * ndotx * nx - 1.0
+    ey: FloatArray = 2.0 * ndotx * ny
+    return ex, ey
