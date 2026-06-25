@@ -1,7 +1,7 @@
-import math
 import pytest
 from pydantic import ValidationError
-from grd_generator.reflector.spec import C_LIGHT, ReflectorSpec, FeedSpec
+
+from grd_generator.reflector.spec import C_LIGHT, FeedSpec, ReflectorSpec
 
 
 def test_reflector_spec_derived_quantities():
