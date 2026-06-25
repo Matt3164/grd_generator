@@ -29,6 +29,7 @@ grd-generate = "grd_generator.generate:main"
 grd-calibrate = "grd_generator.calibrate:main"
 grd-plot = "grd_generator.plot:main"
 grd-gui = "grd_generator.gui:main"
+grd-generate-afr = "grd_generator.reflector.generate_afr:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -74,11 +75,12 @@ addopts = "-q --import-mode=importlib --cov=src/grd_generator --cov-report=term-
 source = ["src/grd_generator"]
 branch = true
 omit = [
-    "*/grd_generator/generate.py",       # script offline : orchestration + écriture .npz
-    "*/grd_generator/calibrate.py",      # script offline : sampling + écriture .npz + CLI
-    "*/grd_generator/plot.py",           # rendu matplotlib : effets de bord graphiques
-    "*/grd_generator/gui.py",            # application Qt : effets de bord interface
-    "*/grd_generator/examples/*",        # scripts d'exemple : testés en lancement
+    "*/grd_generator/generate.py",                      # script offline : orchestration + écriture .npz
+    "*/grd_generator/calibrate.py",                     # script offline : sampling + écriture .npz + CLI
+    "*/grd_generator/plot.py",                          # rendu matplotlib : effets de bord graphiques
+    "*/grd_generator/gui.py",                           # application Qt : effets de bord interface
+    "*/grd_generator/reflector/generate_afr.py",        # script offline AFR : orchestration + écriture .npz
+    "*/grd_generator/examples/*",                       # scripts d'exemple : testés en lancement
     "*/tests/*",
 ]
 
