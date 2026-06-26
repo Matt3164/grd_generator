@@ -45,12 +45,20 @@ from grd_generator.plot import (
     _draw_uv_map,
     draw_earth_envelope_contours,
     draw_earth_pattern_footprints,
+    draw_service_zone_uv,
     draw_zone_and_antenna,
     envelope_max_dbi,
 )
+from grd_generator.reflector import (
+    FeedSpec,
+    ReflectorSpec,
+    ServiceZone,
+    hex_feed_positions,
+    synthesize_reflector_fields,
+)
 from grd_generator.report_ingest import read_report
 from grd_generator.scenario import Scenario, sat_frame_geometry
-from grd_generator.schemas import EllipticalSpec, UVGrid
+from grd_generator.schemas import ComplexField, EllipticalSpec, UVGrid
 from grd_generator.synth import combined_max_directivity_dbi, elliptical_field
 
 REPORTS_DIR = Path(__file__).resolve().parents[2] / "data" / "reference_reports"
@@ -117,6 +125,48 @@ def build_result(
         zone_center=geo.zone_center,
         zone_radius_deg=geo.zone_radius_deg,
         antenna_latlon=(antenna_lat, antenna_lon),
+    )
+
+
+@dataclass(frozen=True)
+class ReflectorResult:
+    """Résultat AFR (pur, sans Qt) : champs co/cross par feed + zone + grille."""
+
+    co_fields: list[ComplexField]
+    cross_fields: list[ComplexField]
+    zone: ServiceZone
+    grid: UVGrid
+
+
+def build_reflector_result(
+    *,
+    diameter_m: float,
+    f_over_d: float,
+    offset_clearance_m: float,
+    freq_ghz: float,
+    q: float,
+    pitch_m: float,
+    n_feeds: int,
+    zone_radius_deg: float,
+    grid: UVGrid,
+) -> ReflectorResult:
+    """Construit le résultat AFR (pur, sans Qt) depuis les paramètres de l'IHM."""
+    spec = ReflectorSpec(
+        diameter_m=diameter_m,
+        focal_length_m=f_over_d * diameter_m,
+        offset_clearance_m=offset_clearance_m,
+        freq_hz=freq_ghz * 1e9,
+    )
+    feeds = FeedSpec(
+        positions_m=hex_feed_positions(pitch_m, n_feeds, focal_radius_m=10.0 * pitch_m),
+        q=q,
+    )
+    co, cross = synthesize_reflector_fields(spec, feeds, grid)
+    return ReflectorResult(
+        co_fields=co,
+        cross_fields=cross,
+        zone=ServiceZone(radius_deg=zone_radius_deg),
+        grid=grid,
     )
 
 
@@ -307,11 +357,185 @@ class PatternStudio(QMainWindow):  # type: ignore[misc]
             self.export_to(path)
 
 
+class ReflectorStudio(QMainWindow):  # type: ignore[misc]
+    """Studio interactif AFR : paramètres réflecteur → champs co/cross + zone."""
+
+    def __init__(self, *, n_u: int = 81, n_v: int = 81) -> None:
+        super().__init__()
+        self.setWindowTitle("grd_generator — Reflector Studio (AFR)")
+        self._n_u = n_u
+        self._n_v = n_v
+        self._afr_result: ReflectorResult | None = None
+        self._axes: Any = None
+        self._cb_dir: Any = None
+        self._cb_phase: Any = None
+        self._cb_env: Any = None
+        self._cb_env_max: Any = None
+
+        # Paramètres réflecteur
+        self._diameter = self._dspin(0.1, 10.0, 2.0, 0.1)
+        self._f_over_d = self._dspin(0.5, 4.0, 1.2, 0.1)
+        self._offset = self._dspin(0.0, 5.0, 0.0, 0.05)
+        self._freq_ghz = self._dspin(1.0, 100.0, 20.0, 1.0)
+        self._q = self._dspin(0.5, 20.0, 2.0, 0.5)
+        self._pitch = self._dspin(0.005, 0.5, 0.03, 0.005)
+        self._n_feeds = self._ispin(1, 127, 7)
+        # bornes zone : [6, 14]° conforme à ServiceZone
+        self._zone_radius = self._dspin(6.0, 14.0, 8.0, 0.5)
+        self._feed_idx = self._ispin(0, 0, 0)
+        self._feed_idx.valueChanged.connect(self._on_feed_changed)
+
+        gen_btn = QPushButton("Générer")
+        gen_btn.clicked.connect(self._on_generate)
+
+        refl = QGroupBox("Réflecteur")
+        rf = QFormLayout(refl)
+        rf.addRow("Diamètre (m)", self._diameter)
+        rf.addRow("F/D", self._f_over_d)
+        rf.addRow("Offset clearance (m)", self._offset)
+        rf.addRow("Fréquence (GHz)", self._freq_ghz)
+        feed_grp = QGroupBox("Réseau de feeds")
+        ff = QFormLayout(feed_grp)
+        ff.addRow("Facteur q (cos^q)", self._q)
+        ff.addRow("Pas pitch (m)", self._pitch)
+        ff.addRow("N feeds", self._n_feeds)
+        zone_grp = QGroupBox("Zone de service")
+        zf = QFormLayout(zone_grp)
+        zf.addRow("Rayon zone (°)", self._zone_radius)
+        disp = QGroupBox("Affichage")
+        df = QFormLayout(disp)
+        df.addRow("Feed n°", self._feed_idx)
+
+        controls = QVBoxLayout()
+        for w in (refl, feed_grp, zone_grp, disp, gen_btn):
+            controls.addWidget(w)
+        controls.addStretch(1)
+        controls_widget = QWidget()
+        controls_widget.setLayout(controls)
+        controls_widget.setMaximumWidth(320)
+
+        self._figure = Figure(figsize=(14, 8))
+        self._canvas = FigureCanvasQTAgg(self._figure)  # type: ignore[no-untyped-call]
+
+        root = QHBoxLayout()
+        root.addWidget(controls_widget)
+        root.addWidget(self._canvas, stretch=1)
+        central = QWidget()
+        central.setLayout(root)
+        self.setCentralWidget(central)
+
+        self.generate()
+
+    def _dspin(self, lo: float, hi: float, val: float, step: float) -> QDoubleSpinBox:
+        s = QDoubleSpinBox()
+        s.setRange(lo, hi)
+        s.setSingleStep(step)
+        s.setValue(val)
+        return s
+
+    def _ispin(self, lo: int, hi: int, val: int) -> QSpinBox:
+        s = QSpinBox()
+        s.setRange(lo, hi)
+        s.setValue(val)
+        return s
+
+    def generate(self) -> None:
+        """Construit le résultat AFR depuis les contrôles et redessine les vues."""
+        grid = UVGrid(
+            u_min=-14.0, u_max=14.0,
+            v_min=-14.0, v_max=14.0,
+            n_u=self._n_u, n_v=self._n_v,
+        )
+        try:
+            result = build_reflector_result(
+                diameter_m=self._diameter.value(),
+                f_over_d=self._f_over_d.value(),
+                offset_clearance_m=self._offset.value(),
+                freq_ghz=self._freq_ghz.value(),
+                q=self._q.value(),
+                pitch_m=self._pitch.value(),
+                n_feeds=self._n_feeds.value(),
+                zone_radius_deg=self._zone_radius.value(),
+                grid=grid,
+            )
+        except ValueError as exc:
+            QMessageBox.warning(self, "Génération impossible", str(exc))
+            return
+        self._afr_result = result
+        n = len(result.co_fields)
+        self._feed_idx.blockSignals(True)
+        self._feed_idx.setRange(0, n - 1)
+        if self._feed_idx.value() > n - 1:
+            self._feed_idx.setValue(0)
+        self._feed_idx.blockSignals(False)
+        self._redraw_all()
+        logger.info("afr_generated", n_feeds=n)
+
+    def _redraw_all(self) -> None:
+        assert self._afr_result is not None
+        r = self._afr_result
+        self._figure.clear()
+        self._axes = self._figure.subplots(2, 3).ravel()
+        self._cb_dir = None
+        self._cb_phase = None
+        self._draw_feed(self._feed_idx.value(), clear=False)
+        # Enveloppe co-pol (combinaison cohérente) sur les axes (u,v)
+        env = combined_max_directivity_dbi(list(r.co_fields))
+        self._cb_env = _draw_uv_map(self._axes[2], r.grid, env, "Enveloppe co-pol")
+        draw_service_zone_uv(self._axes[2], r.zone)
+        # Enveloppe simple max sur les axes (u,v)
+        env_max = envelope_max_dbi(np.stack(r.co_fields))
+        self._cb_env_max = _draw_uv_map(self._axes[3], r.grid, env_max, "Enveloppe max co-pol")
+        draw_service_zone_uv(self._axes[3], r.zone)
+        self._axes[4].axis("off")
+        self._axes[5].axis("off")
+        self._figure.tight_layout()
+        self._canvas.draw_idle()  # type: ignore[no-untyped-call]
+
+    def _draw_feed(self, idx: int, *, clear: bool = True) -> None:
+        assert self._afr_result is not None
+        r = self._afr_result
+        field = r.co_fields[idx]
+        dbi = 10.0 * np.log10(np.maximum(np.abs(field) ** 2, 1e-12))
+        if clear:
+            if self._cb_dir is not None:
+                self._cb_dir.remove()
+            if self._cb_phase is not None:
+                self._cb_phase.remove()
+            self._axes[0].clear()
+            self._axes[1].clear()
+        self._cb_dir = _draw_uv_map(self._axes[0], r.grid, dbi, f"Feed #{idx} — co-pol dBi")
+        draw_service_zone_uv(self._axes[0], r.zone)
+        self._cb_phase = _draw_phase_map(self._axes[1], r.grid, field, f"Feed #{idx} — phase")
+        draw_service_zone_uv(self._axes[1], r.zone)
+
+    def _on_feed_changed(self, idx: int) -> None:
+        if self._afr_result is None:
+            return
+        self._draw_feed(idx)
+        self._canvas.draw_idle()  # type: ignore[no-untyped-call]
+
+    def _on_generate(self) -> None:
+        self.generate()
+
+
 def main() -> None:  # pragma: no cover
     configure_logging()
     parser = argparse.ArgumentParser(description="Studio interactif de calibration de patterns.")
-    parser.parse_args()
+    parser.add_argument(
+        "--mode",
+        choices=["pattern", "reflector"],
+        default="pattern",
+        help=(
+            "Mode de lancement : 'pattern' (défaut) → PatternStudio ;"
+            " 'reflector' → ReflectorStudio (AFR)."
+        ),
+    )
+    args = parser.parse_args()
     app = QApplication.instance() or QApplication(sys.argv)
-    studio = PatternStudio()
+    if args.mode == "reflector":
+        studio: QMainWindow = ReflectorStudio()
+    else:
+        studio = PatternStudio()
     studio.show()
     app.exec()
