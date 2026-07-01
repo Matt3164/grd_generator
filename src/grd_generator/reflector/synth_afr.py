@@ -15,6 +15,30 @@ def hex_feed_positions(
     return hex_centers_uv((0.0, 0.0), focal_radius_m, n_feeds, pitch_m)
 
 
+def form_beam(
+    co_fields: list[ComplexField], grid: UVGrid, target_uv: tuple[float, float]
+) -> ComplexField:
+    """Beam formé par filtre adapté (conjugate beamforming) vers `target_uv` (deg).
+
+    Poids `wᵢ = conj(Eᵢ(cible))` normalisés en norme L2 unité ; champ combiné
+    `B(u,v) = Σᵢ wᵢ·Eᵢ(u,v)`. Par Cauchy-Schwarz, `|B(cible)|² = Σᵢ|Eᵢ(cible)|²`,
+    donc la crête du beam touche l'enveloppe max co-pol au point visé. La cible
+    est projetée sur la cellule de grille la plus proche.
+    """
+    stack = np.stack(co_fields)  # (n_feeds, n_v, n_u)
+    u_axis, v_axis = grid.axes()
+    u0, v0 = target_uv
+    iu = int(np.argmin(np.abs(u_axis - u0)))
+    iv = int(np.argmin(np.abs(v_axis - v0)))
+    samples = stack[:, iv, iu]  # Eᵢ(cible), forme (n_feeds,)
+    norm = float(np.sqrt(np.sum(np.abs(samples) ** 2)))
+    if norm == 0.0:
+        return np.zeros_like(stack[0])
+    weights = np.conj(samples) / norm
+    beam: ComplexField = np.tensordot(weights, stack, axes=([0], [0])).astype(np.complex128)
+    return beam
+
+
 def synthesize_reflector_fields(
     spec: ReflectorSpec,
     feeds: FeedSpec,

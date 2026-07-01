@@ -6,6 +6,7 @@ de l'interface, calibre via la zone et synthétise les champs. Le widget Qt
 """
 
 import argparse
+import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,6 +28,8 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSpinBox,
+    QTabWidget,
+    QTextBrowser,
     QVBoxLayout,
     QWidget,
 )
@@ -53,8 +56,13 @@ from grd_generator.reflector import (
     FeedSpec,
     ReflectorSpec,
     ServiceZone,
+    form_beam,
     hex_feed_positions,
     synthesize_reflector_fields,
+)
+from grd_generator.reflector.grd_export import (
+    patterns_to_zip_bytes,
+    simulation_params_dict,
 )
 from grd_generator.report_ingest import read_report
 from grd_generator.scenario import Scenario, sat_frame_geometry
@@ -371,6 +379,9 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         self._cb_phase: Any = None
         self._cb_env: Any = None
         self._cb_env_max: Any = None
+        self._cb_beam_dir: Any = None
+        self._cb_beam_phase: Any = None
+        self._target_uv: tuple[float, float] = (0.0, 0.0)  # cible du beam formé (deg)
 
         # Paramètres réflecteur
         self._diameter = self._dspin(0.1, 10.0, 2.0, 0.1)
@@ -387,6 +398,10 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
 
         gen_btn = QPushButton("Générer")
         gen_btn.clicked.connect(self._on_generate)
+        grd_btn = QPushButton("Export GRD (ZIP)…")
+        grd_btn.clicked.connect(self._on_export_grd)
+        params_btn = QPushButton("Export params (JSON)…")
+        params_btn.clicked.connect(self._on_export_params)
 
         refl = QGroupBox("Réflecteur")
         rf = QFormLayout(refl)
@@ -407,7 +422,7 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         df.addRow("Feed n°", self._feed_idx)
 
         controls = QVBoxLayout()
-        for w in (refl, feed_grp, zone_grp, disp, gen_btn):
+        for w in (refl, feed_grp, zone_grp, disp, gen_btn, grd_btn, params_btn):
             controls.addWidget(w)
         controls.addStretch(1)
         controls_widget = QWidget()
@@ -416,13 +431,22 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
 
         self._figure = Figure(figsize=(14, 8))
         self._canvas = FigureCanvasQTAgg(self._figure)  # type: ignore[no-untyped-call]
+        # Clic sur une carte (u,v) → recale la cible du beam formé.
+        self._canvas.mpl_connect("button_press_event", self._on_click)
 
-        root = QHBoxLayout()
-        root.addWidget(controls_widget)
-        root.addWidget(self._canvas, stretch=1)
-        central = QWidget()
-        central.setLayout(root)
-        self.setCentralWidget(central)
+        studio_root = QHBoxLayout()
+        studio_root.addWidget(controls_widget)
+        studio_root.addWidget(self._canvas, stretch=1)
+        studio_tab = QWidget()
+        studio_tab.setLayout(studio_root)
+
+        info_tab = QTextBrowser()
+        info_tab.setHtml(_reflector_info_html())
+
+        tabs = QTabWidget()
+        tabs.addTab(studio_tab, "Studio")
+        tabs.addTab(info_tab, "Infos")
+        self.setCentralWidget(tabs)
 
         self.generate()
 
@@ -478,6 +502,8 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         self._axes = self._figure.subplots(2, 3).ravel()
         self._cb_dir = None
         self._cb_phase = None
+        self._cb_beam_dir = None
+        self._cb_beam_phase = None
         self._draw_feed(self._feed_idx.value(), clear=False)
         # Enveloppe co-pol (combinaison cohérente) sur les axes (u,v)
         env = combined_max_directivity_dbi(list(r.co_fields))
@@ -487,9 +513,42 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         env_max = envelope_max_dbi(np.stack(r.co_fields))
         self._cb_env_max = _draw_uv_map(self._axes[3], r.grid, env_max, "Enveloppe max co-pol")
         draw_service_zone_uv(self._axes[3], r.zone)
-        self._axes[4].axis("off")
-        self._axes[5].axis("off")
+        # Beam formé vers la cible (filtre adapté) : directivité + phase
+        self._draw_beam(clear=False)
         self._figure.tight_layout()
+        self._canvas.draw_idle()  # type: ignore[no-untyped-call]
+
+    def _draw_beam(self, *, clear: bool = True) -> None:
+        """Beam formé par filtre adapté vers `self._target_uv` : dBi + phase (axes 4,5)."""
+        assert self._afr_result is not None
+        r = self._afr_result
+        beam = form_beam(list(r.co_fields), r.grid, self._target_uv)
+        dbi = 10.0 * np.log10(np.maximum(np.abs(beam) ** 2, 1e-12))
+        if clear:
+            if self._cb_beam_dir is not None:
+                self._cb_beam_dir.remove()
+            if self._cb_beam_phase is not None:
+                self._cb_beam_phase.remove()
+            self._axes[4].clear()
+            self._axes[5].clear()
+        tu, tv = self._target_uv
+        peak_dbi = float(dbi.max())
+        title = f"Beam formé ({tu:.1f}, {tv:.1f})° — crête {peak_dbi:.1f} dBi"
+        self._cb_beam_dir = _draw_uv_map(self._axes[4], r.grid, dbi, title)
+        draw_service_zone_uv(self._axes[4], r.zone)
+        self._cb_beam_phase = _draw_phase_map(self._axes[5], r.grid, beam, "Beam formé — phase")
+        draw_service_zone_uv(self._axes[5], r.zone)
+        for ax in (self._axes[4], self._axes[5]):
+            ax.plot(tu, tv, "rx", markersize=10, markeredgewidth=2)
+
+    def _on_click(self, event: Any) -> None:
+        """Clic sur une carte (u,v) → recale la cible et redessine le beam formé."""
+        if self._afr_result is None or event.inaxes is None:
+            return
+        if event.xdata is None or event.ydata is None:
+            return
+        self._target_uv = (float(event.xdata), float(event.ydata))
+        self._draw_beam()
         self._canvas.draw_idle()  # type: ignore[no-untyped-call]
 
     def _draw_feed(self, idx: int, *, clear: bool = True) -> None:
@@ -518,6 +577,126 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
     def _on_generate(self) -> None:
         self.generate()
 
+    def _sim_params(self) -> dict[str, Any]:
+        """Paramètres de simulation courants (valeurs des contrôles) pour l'export."""
+        return simulation_params_dict(
+            diameter_m=self._diameter.value(),
+            f_over_d=self._f_over_d.value(),
+            offset_clearance_m=self._offset.value(),
+            freq_ghz=self._freq_ghz.value(),
+            q=self._q.value(),
+            pitch_m=self._pitch.value(),
+            n_feeds=self._n_feeds.value(),
+            zone_radius_deg=self._zone_radius.value(),
+        )
+
+    def _on_export_grd(self) -> None:
+        """Exporte tous les patterns (co + cross) en `.grd` TICRA, un par feed, zippés."""
+        if self._afr_result is None:
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Exporter les patterns GRD (ZIP)", "patterns_grd.zip", "*.zip"
+        )
+        if not path:
+            return
+        r = self._afr_result
+        blob = patterns_to_zip_bytes(
+            list(r.co_fields),
+            list(r.cross_fields),
+            r.grid,
+            freq_hz=self._freq_ghz.value() * 1e9,
+            prefix="feed",
+        )
+        Path(path).write_bytes(blob)
+        logger.info("afr_grd_exported", file=path, n_feeds=len(r.co_fields))
+
+    def _on_export_params(self) -> None:
+        """Exporte uniquement les paramètres de simulation au format JSON."""
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Exporter les paramètres (JSON)", "sim_params.json", "*.json"
+        )
+        if not path:
+            return
+        Path(path).write_text(json.dumps(self._sim_params(), indent=2), encoding="utf-8")
+        logger.info("afr_params_exported", file=path)
+
+
+def _reflector_info_html() -> str:  # pragma: no cover
+    """Contenu HTML de l'onglet Infos : définitions des paramètres + modèle de simulation."""
+    return """
+<h2>Reflector Studio (AFR) — aide</h2>
+<p>Modèle <b>array-fed reflector</b> : un réflecteur parabolique offset illuminé
+par un réseau de feeds dans le plan focal. Chaque feed produit un faisceau
+secondaire ; les cartes montrent chaque faisceau, leurs enveloppes, et un
+faisceau <i>formé</i> vers une cible.</p>
+
+<h3>Paramètres modifiables</h3>
+<table cellpadding="4">
+<tr><th align="left">Paramètre</th><th align="left">Définition exacte</th></tr>
+<tr><td><b>Diamètre (m)</b></td>
+    <td>Diamètre <i>D</i> de l'ouverture projetée du réflecteur. Fixe la largeur de
+    faisceau à −3 dB : θ₃dB ≈ 1,15·λ/<i>D</i>. Plus grand ⇒ faisceau plus fin,
+    directivité plus élevée.</td></tr>
+<tr><td><b>F/D</b></td>
+    <td>Rapport focale/diamètre. La focale vaut <i>F</i> = (F/D)·<i>D</i>. Gouverne
+    le dépointage par feed (θ ≈ BDF·offset/<i>F</i>, donc ∝ 1/<i>F</i>) et
+    l'illumination du bord.</td></tr>
+<tr><td><b>Offset clearance (m)</b></td>
+    <td>Dégagement vertical de l'ouverture sous l'axe du paraboloïde parent.
+    Centre de l'ouverture projetée : <i>clearance</i> + <i>D</i>/2.</td></tr>
+<tr><td><b>Fréquence (GHz)</b></td>
+    <td>Fréquence d'exploitation. Longueur d'onde λ = c/f. Intervient dans la
+    largeur de faisceau (λ/<i>D</i>) et le gradient de phase.</td></tr>
+<tr><td><b>Facteur q (cos^q)</b></td>
+    <td>Taper d'amplitude du feed : diagramme cos<sup>q</sup>(ψ). <i>q</i> élevé ⇒
+    bord du réflecteur sous-illuminé ⇒ faisceau secondaire un peu plus large et
+    moins de spillover, au prix de l'efficacité.</td></tr>
+<tr><td><b>Pas pitch (m)</b></td>
+    <td>Distance centre-à-centre entre deux feeds voisins dans le plan focal
+    (maille hexagonale). Espacement angulaire des faisceaux : Δθ = BDF·pitch/<i>F</i>.
+    Pour 80 feeds, le feed le plus externe est à ≈ 4,7·pitch.</td></tr>
+<tr><td><b>N feeds</b></td>
+    <td>Nombre de feeds (points hexagonaux les plus proches du centre retenus).
+    Remplit un disque de couverture d'autant plus grand.</td></tr>
+<tr><td><b>Rayon zone (°)</b></td>
+    <td>Rayon du disque de service, tracé en cercle blanc pointillé sur toutes les
+    cartes (u,v). N'agit pas sur les champs, seulement sur l'affichage.</td></tr>
+<tr><td><b>Feed n°</b></td>
+    <td>Indice du feed dont le pattern individuel (co-pol dBi + phase) est affiché
+    en haut à gauche.</td></tr>
+<tr><td><b>Cible du beam (clic)</b></td>
+    <td>Cliquer sur n'importe quelle carte (u,v) fixe la coordonnée cible (u,v)°
+    du beam formé par filtre adapté (rangée du bas).</td></tr>
+</table>
+
+<h3>Détail de la simulation</h3>
+<ul>
+<li><b>Champ d'ouverture (optique géométrique)</b> : un point d'ouverture est vu
+du feed sous l'angle ψ = 2·arctan(ρ/2<i>F</i>) ; amplitude cos<sup>q</sup>(ψ).
+Un feed décalé impose un gradient de phase linéaire (beam deviation factor) qui
+dépointe le faisceau secondaire.</li>
+<li><b>Far-field</b> : transformée de Fourier 2D du champ d'ouverture, échantillonnée
+en cosinus directeurs (l,m) = (sinθcosφ, sinθsinφ), puis normalisée en directivité
+(référence isotrope) et rééchantillonnée sur la grille (u,v) en degrés.</li>
+<li><b>Co / cross-pol</b> : décomposition de Ludwig-3 ; la cross-pol vient de la
+géométrie offset.</li>
+<li><b>Beam formé</b> : filtre adapté (conjugate beamforming), poids
+wᵢ = conj(Eᵢ(cible)) normalisés en norme L2 ⇒ la crête touche l'enveloppe co-pol
+max au point visé.</li>
+<li><b>Enveloppes</b> : « Enveloppe co-pol » = RSS 10·log₁₀ Σ|Eᵢ|² (directivité max
+<i>atteignable</i>, lisse) ; « Enveloppe max co-pol » = max des faisceaux
+individuels (montre le festonnage réel).</li>
+</ul>
+
+<h3>Exports</h3>
+<ul>
+<li><b>Export GRD (ZIP)</b> : un fichier <code>.grd</code> TICRA GRASP ASCII par feed
+(co + cross, Ludwig-3, grille en cosinus directeurs IGRID=1), rassemblés dans un ZIP.</li>
+<li><b>Export params (JSON)</b> : uniquement les paramètres de simulation courants
+(dont la focale dérivée).</li>
+</ul>
+"""
+
 
 def main() -> None:  # pragma: no cover
     configure_logging()
@@ -539,3 +718,7 @@ def main() -> None:  # pragma: no cover
         studio = PatternStudio()
     studio.show()
     app.exec()
+
+
+if __name__ == "__main__":
+    main()
