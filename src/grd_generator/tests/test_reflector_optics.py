@@ -50,3 +50,45 @@ def test_pol_vectors_cross_in_diagonal() -> None:
     Y = np.array([[0.4]])
     ex, ey = optics.aperture_pol_vectors(spec, X, Y)
     assert abs(ey[0, 0]) > 1e-6           # diagonal region → cross-pol present
+
+
+def test_aperture_field_defocus_zero_is_identical_to_default() -> None:
+    spec = _spec()
+    X, Y, inside, dx = optics.aperture_grid(spec, n_aperture=32, pad_factor=2)
+    field_default = optics.aperture_field(spec, (0.01, 0.0), X, Y, inside, q=2.0)
+    field_explicit_zero = optics.aperture_field(
+        spec, (0.01, 0.0), X, Y, inside, q=2.0, defocus_m=0.0
+    )
+    np.testing.assert_array_equal(field_default, field_explicit_zero)
+
+
+def test_aperture_field_defocus_adds_expected_quadratic_phase() -> None:
+    spec = _spec()
+    X, Y, inside, dx = optics.aperture_grid(spec, n_aperture=32, pad_factor=2)
+    defocus_m = 0.2
+    for feed_xy in [(0.0, 0.0), (0.02, -0.01)]:
+        field_nodefocus = optics.aperture_field(spec, feed_xy, X, Y, inside, q=2.0)
+        field_defocus = optics.aperture_field(
+            spec, feed_xy, X, Y, inside, q=2.0, defocus_m=defocus_m
+        )
+        psi = optics.illumination_angle(X, Y, spec.focal_length_m)
+        k = 2.0 * np.pi / spec.wavelength_m
+        expected_extra_phase = k * defocus_m * (1.0 - np.cos(psi))
+        # Ratio plutôt que différence brute pour éviter le wrap de phase ; on
+        # ramène aussi l'attendu dans (-pi, pi] par la même transformation,
+        # car la phase attendue peut dépasser un tour complet sur l'ouverture.
+        extra_phase = np.angle(field_defocus[inside] / field_nodefocus[inside])
+        expected_wrapped = np.angle(np.exp(1j * expected_extra_phase[inside]))
+        np.testing.assert_allclose(extra_phase, expected_wrapped, atol=1e-9)
+
+
+def test_aperture_field_defocus_sign_flips_extra_phase() -> None:
+    spec = _spec()
+    X, Y, inside, dx = optics.aperture_grid(spec, n_aperture=32, pad_factor=2)
+    feed_xy = (0.0, 0.0)
+    field_nodefocus = optics.aperture_field(spec, feed_xy, X, Y, inside, q=2.0)
+    field_pos = optics.aperture_field(spec, feed_xy, X, Y, inside, q=2.0, defocus_m=0.2)
+    field_neg = optics.aperture_field(spec, feed_xy, X, Y, inside, q=2.0, defocus_m=-0.2)
+    extra_phase_pos = np.angle(field_pos[inside] / field_nodefocus[inside])
+    extra_phase_neg = np.angle(field_neg[inside] / field_nodefocus[inside])
+    np.testing.assert_allclose(extra_phase_pos, -extra_phase_neg, atol=1e-9)

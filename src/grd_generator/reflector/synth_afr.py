@@ -53,7 +53,9 @@ def synthesize_reflector_fields(
     co_fields: list[ComplexField] = []
     cross_fields: list[ComplexField] = []
     for feed_xy in feeds.positions_m:
-        scalar = optics.aperture_field(spec, feed_xy, X, Y, inside, feeds.q)
+        scalar = optics.aperture_field(
+            spec, feed_xy, X, Y, inside, feeds.q, defocus_m=feeds.defocus_m
+        )
         Fx, L, M = farfield.far_field_fft(scalar * ex, dx, spec.wavelength_m)
         Fy, _, _ = farfield.far_field_fft(scalar * ey, dx, spec.wavelength_m)
         e_co, e_cross = farfield.ludwig3_co_cross(Fx, Fy, L, M)

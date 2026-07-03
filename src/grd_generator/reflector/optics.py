@@ -5,6 +5,21 @@ paraboloïde parent) est illuminé par le feed sous l'angle polaire
 ψ = 2·arctan(ρ/2F) (ρ = ‖(X,Y)‖) ; l'amplitude suit le diagramme de feed cos^q(ψ).
 Un feed décalé de (δx, δy) dans le plan focal impose un gradient de phase linéaire
 (beam deviation factor) qui dépointe le faisceau secondaire.
+
+Un feed défocalisé de δz le long de l'axe focal (>0 = feed reculé, éloigné du
+réflecteur) ajoute une phase d'erreur quadratique en ouverture :
+
+    φ_defocus(ψ) = k·δz·(1 − cosψ),  k = 2π/λ
+
+Justification : pour un paraboloïde idéal, le trajet feed→ouverture est
+constant (propriété de foyer) uniquement si le feed est au foyer exact. Un
+déplacement axial δz du feed introduit une différence de marche
+≈ −δz·cosψ (mesurée depuis le foyer, le long du rayon d'angle ψ) ; à une
+constante additive près référencée à ψ=0 (le long de l'axe, différence de
+marche nulle par convention), la phase correspondante est k·δz·(1 − cosψ).
+Ce terme s'ajoute au tilt de dépointage existant. Il ne dépend que de ψ (pas
+de la position du feed dans le plan focal) : il étale symétriquement le
+pattern par feed autour de sa direction pointée, sans la déplacer.
 """
 
 import numpy as np
@@ -47,14 +62,23 @@ def aperture_field(
     Y: FloatArray,
     inside: NDArray[np.bool_],
     q: float,
+    defocus_m: float = 0.0,
 ) -> ComplexArray:
-    """Champ scalaire d'ouverture pour un feed : taper cos^q(ψ) + tilt de phase."""
+    """Champ scalaire d'ouverture pour un feed : taper cos^q(ψ) + tilt + defocus.
+
+    `defocus_m` (δz, >0 = feed reculé) ajoute la phase quadratique
+    `k·δz·(1 − cosψ)` (voir docstring du module) à la phase de tilt existante.
+    Avec `defocus_m=0.0`, `1 − cos(0)` = 0 : le champ est strictement inchangé.
+    """
     psi = illumination_angle(X, Y, spec.focal_length_m)
     amp = np.cos(psi) ** q
     k = 2.0 * np.pi / spec.wavelength_m
     dxf, dyf = feed_xy
     tilt = -k * spec.beam_deviation_factor * (dxf * X + dyf * Y) / spec.focal_length_m
-    field: ComplexArray = (inside * amp * np.exp(1j * tilt)).astype(np.complex128)
+    defocus_phase = k * defocus_m * (1.0 - np.cos(psi))
+    field: ComplexArray = (inside * amp * np.exp(1j * (tilt + defocus_phase))).astype(
+        np.complex128
+    )
     return field
 
 
