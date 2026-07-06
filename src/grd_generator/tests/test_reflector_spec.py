@@ -19,3 +19,10 @@ def test_reflector_spec_rejects_nonpositive() -> None:
 def test_feed_spec_counts() -> None:
     feeds = FeedSpec(positions_m=[(0.0, 0.0), (0.01, 0.0)], q=2.0)
     assert feeds.n_feeds == 2
+
+
+def test_feed_spec_defocus_defaults_to_zero_and_accepts_negative() -> None:
+    feeds = FeedSpec(positions_m=[(0.0, 0.0)], q=2.0)
+    assert feeds.defocus_m == 0.0
+    feeds_negative = FeedSpec(positions_m=[(0.0, 0.0)], q=2.0, defocus_m=-0.3)
+    assert feeds_negative.defocus_m == pytest.approx(-0.3)

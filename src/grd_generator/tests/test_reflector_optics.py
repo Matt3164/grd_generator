@@ -50,3 +50,62 @@ def test_pol_vectors_cross_in_diagonal() -> None:
     Y = np.array([[0.4]])
     ex, ey = optics.aperture_pol_vectors(spec, X, Y)
     assert abs(ey[0, 0]) > 1e-6           # diagonal region → cross-pol present
+
+
+def test_aperture_field_defocus_zero_is_identical_to_default() -> None:
+    spec = _spec()
+    X, Y, inside, dx = optics.aperture_grid(spec, n_aperture=32, pad_factor=2)
+    field_default = optics.aperture_field(spec, (0.01, 0.0), X, Y, inside, q=2.0)
+    field_explicit_zero = optics.aperture_field(
+        spec, (0.01, 0.0), X, Y, inside, q=2.0, defocus_m=0.0
+    )
+    np.testing.assert_array_equal(field_default, field_explicit_zero)
+
+
+def test_aperture_field_defocus_adds_expected_quadratic_phase_up_to_plane() -> None:
+    # L'ouverture est un disque offset (centré en Y0 = D/2 ≠ 0, cf. spec) :
+    # k·δz·(1−cosψ) contient, en plus du terme quadratique attendu, une
+    # composante plane a+b·X+c·Y qui agirait comme un dépointage supplémentaire
+    # si elle n'était pas retirée (voir docstring du module/aperture_field).
+    # On vérifie donc l'égalité à ce plan près : on l'ajuste ici même sur la
+    # phase brute, exactement comme aperture_field est censé le faire en
+    # interne, et on compare le résidu à la phase effectivement appliquée.
+    spec = _spec()
+    X, Y, inside, dx = optics.aperture_grid(spec, n_aperture=32, pad_factor=2)
+    defocus_m = 0.2
+    for feed_xy in [(0.0, 0.0), (0.02, -0.01)]:
+        field_nodefocus = optics.aperture_field(spec, feed_xy, X, Y, inside, q=2.0)
+        field_defocus = optics.aperture_field(
+            spec, feed_xy, X, Y, inside, q=2.0, defocus_m=defocus_m
+        )
+        psi = optics.illumination_angle(X, Y, spec.focal_length_m)
+        k = 2.0 * np.pi / spec.wavelength_m
+        raw_phase = k * defocus_m * (1.0 - np.cos(psi))
+
+        design = np.column_stack((np.ones(int(inside.sum())), X[inside], Y[inside]))
+        coeffs, *_ = np.linalg.lstsq(design, raw_phase[inside], rcond=None)
+        plane = coeffs[0] + coeffs[1] * X + coeffs[2] * Y
+        expected_extra_phase = raw_phase - plane
+
+        # Le plan retiré est non trivial (ouverture offset → gradient en Y) :
+        # ce test distinguerait bien un correctif qui ne retirerait rien.
+        assert abs(coeffs[2]) > 1e-6
+
+        # Ratio plutôt que différence brute pour éviter le wrap de phase ; on
+        # ramène aussi l'attendu dans (-pi, pi] par la même transformation,
+        # car la phase attendue peut dépasser un tour complet sur l'ouverture.
+        extra_phase = np.angle(field_defocus[inside] / field_nodefocus[inside])
+        expected_wrapped = np.angle(np.exp(1j * expected_extra_phase[inside]))
+        np.testing.assert_allclose(extra_phase, expected_wrapped, atol=1e-9)
+
+
+def test_aperture_field_defocus_sign_flips_extra_phase() -> None:
+    spec = _spec()
+    X, Y, inside, dx = optics.aperture_grid(spec, n_aperture=32, pad_factor=2)
+    feed_xy = (0.0, 0.0)
+    field_nodefocus = optics.aperture_field(spec, feed_xy, X, Y, inside, q=2.0)
+    field_pos = optics.aperture_field(spec, feed_xy, X, Y, inside, q=2.0, defocus_m=0.2)
+    field_neg = optics.aperture_field(spec, feed_xy, X, Y, inside, q=2.0, defocus_m=-0.2)
+    extra_phase_pos = np.angle(field_pos[inside] / field_nodefocus[inside])
+    extra_phase_neg = np.angle(field_neg[inside] / field_nodefocus[inside])
+    np.testing.assert_allclose(extra_phase_pos, -extra_phase_neg, atol=1e-9)

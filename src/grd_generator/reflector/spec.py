@@ -33,6 +33,9 @@ class FeedSpec(BaseModel):
 
     positions_m: list[tuple[float, float]]
     q: float = Field(..., ge=0.0)
+    # Déplacement axial du plan des feeds (m), le long de l'axe focal
+    # (>0 = feed reculé, éloigné du réflecteur). Pas de contrainte de signe.
+    defocus_m: float = Field(0.0)
 
     @property
     def n_feeds(self) -> int:

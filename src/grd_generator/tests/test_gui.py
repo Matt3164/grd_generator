@@ -47,6 +47,18 @@ def test_build_reflector_result_pure() -> None:
     assert res.co_fields[0].shape == (41, 41)
 
 
+def test_build_reflector_result_with_defocus() -> None:
+    grid = UVGrid(u_min=-14, u_max=14, v_min=-14, v_max=14, n_u=41, n_v=41)
+    res = build_reflector_result(
+        diameter_m=2.0, f_over_d=1.2, offset_clearance_m=0.0, freq_ghz=20.0,
+        q=2.0, pitch_m=0.03, n_feeds=7, zone_radius_deg=8.0, grid=grid,
+        defocus_m=0.2,
+    )
+    assert isinstance(res, ReflectorResult)
+    assert len(res.co_fields) == 7
+    assert res.co_fields[0].shape == (41, 41)
+
+
 def test_build_result_is_reproducible() -> None:
     kw = dict(
         antenna_lat=46.6, antenna_lon=2.5, sat_lon=3.0, zone_radius_deg=6.0,
@@ -56,3 +68,20 @@ def test_build_result_is_reproducible() -> None:
     a = build_result(**kw)  # type: ignore[arg-type]
     b = build_result(**kw)  # type: ignore[arg-type]
     assert np.allclose(a.fields, b.fields)
+
+
+def test_reflector_studio_pitch_spinbox_accepts_millimeters() -> None:
+    """Régression : le spinbox pitch (décimales=3) doit accepter 0.004 m sans arrondi."""
+    import os
+
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    os.environ.setdefault("MPLBACKEND", "Agg")
+    from PyQt6.QtWidgets import QApplication
+
+    from grd_generator.gui import ReflectorStudio
+
+    _app = QApplication.instance() or QApplication([])
+    studio = ReflectorStudio(n_u=21, n_v=21)
+    studio._pitch.setValue(0.004)
+    assert studio._pitch.value() == 0.004
+    studio.close()

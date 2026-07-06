@@ -157,6 +157,7 @@ def build_reflector_result(
     n_feeds: int,
     zone_radius_deg: float,
     grid: UVGrid,
+    defocus_m: float = 0.0,
 ) -> ReflectorResult:
     """Construit le résultat AFR (pur, sans Qt) depuis les paramètres de l'IHM."""
     spec = ReflectorSpec(
@@ -168,6 +169,7 @@ def build_reflector_result(
     feeds = FeedSpec(
         positions_m=hex_feed_positions(pitch_m, n_feeds, focal_radius_m=10.0 * pitch_m),
         q=q,
+        defocus_m=defocus_m,
     )
     co, cross = synthesize_reflector_fields(spec, feeds, grid)
     return ReflectorResult(
@@ -251,8 +253,11 @@ class PatternStudio(QMainWindow):  # type: ignore[misc]
 
         self.generate()
 
-    def _dspin(self, lo: float, hi: float, val: float, step: float) -> QDoubleSpinBox:
+    def _dspin(
+        self, lo: float, hi: float, val: float, step: float, decimals: int = 2
+    ) -> QDoubleSpinBox:
         s = QDoubleSpinBox()
+        s.setDecimals(decimals)
         s.setRange(lo, hi)
         s.setSingleStep(step)
         s.setValue(val)
@@ -384,13 +389,14 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         self._target_uv: tuple[float, float] = (0.0, 0.0)  # cible du beam formé (deg)
 
         # Paramètres réflecteur
-        self._diameter = self._dspin(0.1, 10.0, 2.0, 0.1)
+        self._diameter = self._dspin(0.1, 25.0, 2.0, 0.1)
         self._f_over_d = self._dspin(0.5, 4.0, 1.2, 0.1)
         self._offset = self._dspin(0.0, 5.0, 0.0, 0.05)
         self._freq_ghz = self._dspin(1.0, 100.0, 20.0, 1.0)
         self._q = self._dspin(0.5, 20.0, 2.0, 0.5)
-        self._pitch = self._dspin(0.005, 0.5, 0.03, 0.005)
+        self._pitch = self._dspin(0.002, 0.5, 0.03, 0.001, decimals=3)
         self._n_feeds = self._ispin(1, 127, 7)
+        self._defocus = self._dspin(-5.0, 5.0, 0.0, 0.1)
         # bornes zone : [6, 14]° conforme à ServiceZone
         self._zone_radius = self._dspin(6.0, 14.0, 8.0, 0.5)
         self._feed_idx = self._ispin(0, 0, 0)
@@ -414,6 +420,7 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         ff.addRow("Facteur q (cos^q)", self._q)
         ff.addRow("Pas pitch (m)", self._pitch)
         ff.addRow("N feeds", self._n_feeds)
+        ff.addRow("Defocus (m)", self._defocus)
         zone_grp = QGroupBox("Zone de service")
         zf = QFormLayout(zone_grp)
         zf.addRow("Rayon zone (°)", self._zone_radius)
@@ -450,8 +457,11 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
 
         self.generate()
 
-    def _dspin(self, lo: float, hi: float, val: float, step: float) -> QDoubleSpinBox:
+    def _dspin(
+        self, lo: float, hi: float, val: float, step: float, decimals: int = 2
+    ) -> QDoubleSpinBox:
         s = QDoubleSpinBox()
+        s.setDecimals(decimals)
         s.setRange(lo, hi)
         s.setSingleStep(step)
         s.setValue(val)
@@ -481,6 +491,7 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
                 n_feeds=self._n_feeds.value(),
                 zone_radius_deg=self._zone_radius.value(),
                 grid=grid,
+                defocus_m=self._defocus.value(),
             )
         except ValueError as exc:
             QMessageBox.warning(self, "Génération impossible", str(exc))
@@ -588,6 +599,7 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
             pitch_m=self._pitch.value(),
             n_feeds=self._n_feeds.value(),
             zone_radius_deg=self._zone_radius.value(),
+            defocus_m=self._defocus.value(),
         )
 
     def _on_export_grd(self) -> None:
@@ -658,6 +670,12 @@ faisceau <i>formé</i> vers une cible.</p>
 <tr><td><b>N feeds</b></td>
     <td>Nombre de feeds (points hexagonaux les plus proches du centre retenus).
     Remplit un disque de couverture d'autant plus grand.</td></tr>
+<tr><td><b>Defocus (m)</b></td>
+    <td>Déplacement axial du plan des feeds le long de l'axe focal (&gt;0 = feed
+    reculé). Ajoute une phase d'erreur quadratique en ouverture qui étale le
+    pattern par feed (crête plus basse, enveloppe plus large) ; le beamforming
+    (filtre adapté déjà en place) refocalise et recombine partiellement
+    l'énergie perdue, sans l'annuler entièrement.</td></tr>
 <tr><td><b>Rayon zone (°)</b></td>
     <td>Rayon du disque de service, tracé en cercle blanc pointillé sur toutes les
     cartes (u,v). N'agit pas sur les champs, seulement sur l'affichage.</td></tr>

@@ -3,6 +3,7 @@ import math
 import zipfile
 
 import numpy as np
+import pytest
 
 from grd_generator.reflector.grd_export import (
     pattern_to_grd,
@@ -98,3 +99,19 @@ def test_simulation_params_dict_computes_focal_length() -> None:
     assert params["n_feeds"] == 80
     assert math.isclose(params["focal_length_m"], 2.4)  # f_over_d * diameter
     assert params["freq_ghz"] == 20.0
+    assert params["defocus_m"] == 0.0  # défaut quand non fourni
+
+
+def test_simulation_params_dict_includes_defocus_m() -> None:
+    params = simulation_params_dict(
+        diameter_m=2.0,
+        f_over_d=1.2,
+        offset_clearance_m=0.0,
+        freq_ghz=20.0,
+        q=2.0,
+        pitch_m=0.03,
+        n_feeds=80,
+        zone_radius_deg=6.0,
+        defocus_m=0.15,
+    )
+    assert params["defocus_m"] == pytest.approx(0.15)
