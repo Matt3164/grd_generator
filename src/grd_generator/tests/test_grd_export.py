@@ -104,6 +104,8 @@ def test_simulation_params_dict_computes_focal_length() -> None:
     assert params["phase_corr_length_m"] == pytest.approx(0.05)  # défaut quand non fourni
     assert params["phase_error_seed"] == 0  # défaut quand non fourni
     assert params["phase_error_shared_rms_rad"] == 0.0  # défaut quand non fourni
+    assert params["footprint_m"] == 0.0  # défaut quand non fourni
+    assert params["footprint_magnification"] == 0.0  # défaut quand non fourni
 
 
 def test_simulation_params_dict_includes_defocus_m() -> None:
@@ -153,3 +155,20 @@ def test_simulation_params_dict_includes_phase_error_shared_rms_rad() -> None:
         phase_error_shared_rms_rad=0.7,
     )
     assert params["phase_error_shared_rms_rad"] == pytest.approx(0.7)
+
+
+def test_simulation_params_dict_includes_footprint_fields() -> None:
+    params = simulation_params_dict(
+        diameter_m=2.2,
+        f_over_d=1.2,
+        offset_clearance_m=0.0,
+        freq_ghz=20.0,
+        q=2.0,
+        pitch_m=0.004,
+        n_feeds=19,
+        zone_radius_deg=6.0,
+        footprint_m=0.28,
+        footprint_magnification=48.0,
+    )
+    assert params["footprint_m"] == pytest.approx(0.28)
+    assert params["footprint_magnification"] == pytest.approx(48.0)

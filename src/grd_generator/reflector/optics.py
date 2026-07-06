@@ -54,6 +54,31 @@ retirée : l'errance de pointage aléatoire par feed qu'introduit le bruit
 basse fréquence est un effet recherché, qui reproduit la dispersion des
 centres de faisceau observée sur données réelles (le pitch, lui, ne pilote
 que l'espacement nominal des faisceaux).
+
+Modèle deux échelles (empreinte d'illumination) : `diameter_m` redevient le
+vrai diamètre physique du réflecteur, mais un feed donné n'en illumine
+physiquement qu'une empreinte limitée — pas la pleine ouverture.
+`footprint_amplitude_mask` modélise cette empreinte par un masque gaussien
+en amplitude, de diamètre à mi-hauteur (FWHM, en amplitude) `footprint_m` :
+
+    mask(X,Y) = exp(-4·ln2·(r/footprint_m)²)
+
+où r est la distance du point d'ouverture au centre de l'empreinte. Ce
+masque multiplie le taper cos^q(ψ) existant dans `aperture_field` : c'est
+lui, et non plus le diamètre du réflecteur, qui fixe la largeur du lobe et
+le gain élémentaires. Le centre de l'empreinte par défaut (magnification=0)
+est le centre du disque d'ouverture `(0, aperture_center_y_m)` ; un feed
+décalé de (δx, δy) dans le plan focal déplace ce centre de
+`magnification·(δx, δy)` — la magnification convertit un déplacement feed
+(petit, dans le plan focal) en déplacement d'empreinte (potentiellement bien
+plus grand, sur le disque physique), ce qui permet à un cluster de feeds de
+faire paver leurs empreintes sur toute l'ouverture ; le beam formé
+(`synth_afr.form_beam`) recombine alors ces empreintes en une pleine
+ouverture effective. `footprint_m == 0.0` désactive le masque (pleine
+ouverture, comportement strictement inchangé). Si l'empreinte déborde du
+disque (magnification × décalage trop grand), elle est simplement tronquée
+par le masque `inside` existant — pas d'erreur, juste une empreinte
+partiellement hors du réflecteur (moins d'énergie captée, cf. tests).
 """
 
 import numpy as np
@@ -147,6 +172,31 @@ def random_phase_screen(
     return screen
 
 
+def footprint_amplitude_mask(
+    X: FloatArray,
+    Y: FloatArray,
+    feed_xy: tuple[float, float],
+    aperture_center_y_m: float,
+    footprint_m: float,
+    magnification: float,
+) -> FloatArray:
+    """Masque d'amplitude gaussien de l'empreinte d'illumination d'un feed.
+
+    `footprint_m` est le diamètre FWHM (à mi-hauteur, en amplitude — pas en
+    puissance) de l'empreinte ; le centre est `(0, aperture_center_y_m) +
+    magnification·feed_xy` (voir docstring du module pour la justification
+    physique). Précondition : `footprint_m > 0` (appelant : ne pas invoquer
+    à `footprint_m == 0`, cf. `aperture_field`).
+    """
+    dxf, dyf = feed_xy
+    cx = magnification * dxf
+    cy = aperture_center_y_m + magnification * dyf
+    r2 = (X - cx) ** 2 + (Y - cy) ** 2
+    k = 4.0 * np.log(2.0) / footprint_m**2
+    mask: FloatArray = np.exp(-k * r2)
+    return mask
+
+
 def aperture_field(
     spec: ReflectorSpec,
     feed_xy: tuple[float, float],
@@ -156,6 +206,8 @@ def aperture_field(
     q: float,
     defocus_m: float = 0.0,
     extra_phase: FloatArray | None = None,
+    footprint_m: float = 0.0,
+    footprint_magnification: float = 0.0,
 ) -> ComplexArray:
     """Champ scalaire d'ouverture pour un feed : taper cos^q(ψ) + tilt + defocus.
 
@@ -176,9 +228,19 @@ def aperture_field(
     aléatoire construit par l'appelant via `random_phase_screen` (l'appelant
     porte le contexte par-feed : RNG seedé, paramètres). Avec
     `extra_phase=None`, le champ est strictement inchangé.
+
+    `footprint_m` (> 0) multiplie le taper cos^q(ψ) par le masque gaussien
+    `footprint_amplitude_mask` (voir docstring du module) : modèle deux
+    échelles où le feed n'illumine qu'une empreinte limitée du réflecteur.
+    Avec `footprint_m=0.0` (défaut), aucun masque n'est calculé ni appliqué,
+    le champ est strictement inchangé (même early-out que `defocus_m`).
     """
     psi = illumination_angle(X, Y, spec.focal_length_m)
     amp = np.cos(psi) ** q
+    if footprint_m != 0.0:
+        amp = amp * footprint_amplitude_mask(
+            X, Y, feed_xy, spec.aperture_center_y_m, footprint_m, footprint_magnification
+        )
     k = 2.0 * np.pi / spec.wavelength_m
     dxf, dyf = feed_xy
     tilt = -k * spec.beam_deviation_factor * (dxf * X + dyf * Y) / spec.focal_length_m

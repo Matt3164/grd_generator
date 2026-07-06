@@ -162,6 +162,10 @@ def build_reflector_result(
     phase_corr_length_m: float = 0.05,
     phase_error_seed: int = 0,
     phase_error_shared_rms_rad: float = 0.0,
+    footprint_m: float = 0.0,
+    footprint_magnification: float = 0.0,
+    n_aperture: int = 128,
+    pad_factor: int = 4,
 ) -> ReflectorResult:
     """Construit le résultat AFR (pur, sans Qt) depuis les paramètres de l'IHM."""
     spec = ReflectorSpec(
@@ -178,8 +182,12 @@ def build_reflector_result(
         phase_corr_length_m=phase_corr_length_m,
         phase_error_seed=phase_error_seed,
         phase_error_shared_rms_rad=phase_error_shared_rms_rad,
+        footprint_m=footprint_m,
+        footprint_magnification=footprint_magnification,
     )
-    co, cross = synthesize_reflector_fields(spec, feeds, grid)
+    co, cross = synthesize_reflector_fields(
+        spec, feeds, grid, n_aperture=n_aperture, pad_factor=pad_factor
+    )
     return ReflectorResult(
         co_fields=co,
         cross_fields=cross,
@@ -396,8 +404,11 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         self._cb_beam_phase: Any = None
         self._target_uv: tuple[float, float] = (0.0, 0.0)  # cible du beam formé (deg)
 
-        # Paramètres réflecteur
-        self._diameter = self._dspin(0.1, 25.0, 2.0, 0.1)
+        # Paramètres réflecteur — diamètre physique réaliste par défaut (2.2 m) ;
+        # avec le modèle deux échelles, l'ouverture effective par élément est
+        # gouvernée par l'empreinte (voir groupe "Réseau de feeds"), pas par ce
+        # diamètre.
+        self._diameter = self._dspin(0.1, 25.0, 2.2, 0.1)
         self._f_over_d = self._dspin(0.5, 4.0, 1.2, 0.1)
         self._offset = self._dspin(0.0, 5.0, 0.0, 0.05)
         self._freq_ghz = self._dspin(1.0, 100.0, 20.0, 1.0)
@@ -408,6 +419,8 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         self._phase_rms = self._dspin(0.0, 3.0, 0.0, 0.05, decimals=2)
         self._phase_shared_rms = self._dspin(0.0, 3.0, 0.0, 0.05, decimals=2)
         self._phase_corr = self._dspin(0.005, 0.5, 0.05, 0.005, decimals=3)
+        self._footprint = self._dspin(0.0, 5.0, 0.0, 0.01, decimals=3)
+        self._footprint_mag = self._dspin(-200.0, 200.0, 0.0, 1.0, decimals=2)
         # bornes zone : [6, 14]° conforme à ServiceZone
         self._zone_radius = self._dspin(6.0, 14.0, 8.0, 0.5)
         self._feed_idx = self._ispin(0, 0, 0)
@@ -435,6 +448,8 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         ff.addRow("σ par feed (rad)", self._phase_rms)
         ff.addRow("σ commun (rad)", self._phase_shared_rms)
         ff.addRow("Corrélation (m)", self._phase_corr)
+        ff.addRow("Empreinte (m)", self._footprint)
+        ff.addRow("Magnification", self._footprint_mag)
         zone_grp = QGroupBox("Zone de service")
         zf = QFormLayout(zone_grp)
         zf.addRow("Rayon zone (°)", self._zone_radius)
@@ -509,6 +524,8 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
                 phase_error_rms_rad=self._phase_rms.value(),
                 phase_corr_length_m=self._phase_corr.value(),
                 phase_error_shared_rms_rad=self._phase_shared_rms.value(),
+                footprint_m=self._footprint.value(),
+                footprint_magnification=self._footprint_mag.value(),
             )
         except ValueError as exc:
             QMessageBox.warning(self, "Génération impossible", str(exc))
@@ -620,6 +637,8 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
             phase_error_rms_rad=self._phase_rms.value(),
             phase_corr_length_m=self._phase_corr.value(),
             phase_error_shared_rms_rad=self._phase_shared_rms.value(),
+            footprint_m=self._footprint.value(),
+            footprint_magnification=self._footprint_mag.value(),
         )
 
     def _on_export_grd(self) -> None:
@@ -666,9 +685,11 @@ faisceau <i>formé</i> vers une cible.</p>
 <table cellpadding="4">
 <tr><th align="left">Paramètre</th><th align="left">Définition exacte</th></tr>
 <tr><td><b>Diamètre (m)</b></td>
-    <td>Diamètre <i>D</i> de l'ouverture projetée du réflecteur. Fixe la largeur de
-    faisceau à −3 dB : θ₃dB ≈ 1,15·λ/<i>D</i>. Plus grand ⇒ faisceau plus fin,
-    directivité plus élevée.</td></tr>
+    <td>Diamètre <i>D</i> physique du réflecteur (disque réel, ex. 2,2 m). Avec
+    une Empreinte &gt; 0, ce diamètre fixe l'étendue du grand réflecteur, mais
+    <i>pas</i> la largeur de faisceau élémentaire par feed : voir Empreinte
+    ci-dessous (modèle deux échelles). Sans empreinte (=0, pleine ouverture),
+    <i>D</i> gouverne directement θ₃dB ≈ 1,15·λ/<i>D</i>.</td></tr>
 <tr><td><b>F/D</b></td>
     <td>Rapport focale/diamètre. La focale vaut <i>F</i> = (F/D)·<i>D</i>. Gouverne
     le dépointage par feed (θ ≈ BDF·offset/<i>F</i>, donc ∝ 1/<i>F</i>) et
@@ -716,6 +737,21 @@ faisceau <i>formé</i> vers une cible.</p>
     (grain fin ⇒ corrélation courte, texture plus large ⇒ corrélation
     longue), à σ fixé.
     Sans effet si σ=0.</td></tr>
+<tr><td><b>Empreinte (m)</b></td>
+    <td>Modèle deux échelles : le Diamètre ci-dessus est le vrai réflecteur
+    physique, mais chaque feed n'en illumine qu'une empreinte gaussienne
+    limitée, de ce diamètre (FWHM en amplitude). C'est elle, et non plus le
+    diamètre du réflecteur, qui fixe la largeur de faisceau et le gain
+    élémentaires par feed. 0 (défaut) : désactivée, pleine ouverture,
+    comportement inchangé.</td></tr>
+<tr><td><b>Magnification</b></td>
+    <td>Déplacement du centre de l'empreinte par mètre de décalage du feed
+    dans le plan focal (m/m) : en balayant le cluster de feeds, les
+    empreintes se déplacent sur le grand réflecteur et pavent une zone plus
+    large que l'empreinte seule. Le beam formé (rangée du bas) recombine
+    alors ces empreintes en une pleine ouverture effective — c'est l'intérêt
+    de la magnification. 0 (défaut) : empreinte centrée pour tous les feeds
+    (pas de balayage). Sans effet si Empreinte=0.</td></tr>
 <tr><td><b>Rayon zone (°)</b></td>
     <td>Rayon du disque de service, tracé en cercle blanc pointillé sur toutes les
     cartes (u,v). N'agit pas sur les champs, seulement sur l'affichage.</td></tr>

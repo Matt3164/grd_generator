@@ -74,6 +74,21 @@ def synthesize_reflector_fields(
     écrans se cumulent par simple somme). Si les deux rms sont nuls, aucun
     RNG n'est instancié et le comportement est strictement identique à
     l'absence d'écran.
+
+    Si `feeds.footprint_m > 0`, le taper cos^q(ψ) de chaque feed est en outre
+    multiplié par le masque gaussien `optics.footprint_amplitude_mask` (modèle
+    deux échelles : le feed n'illumine qu'une empreinte limitée du réflecteur,
+    voir docstring du module `optics`). Sans effet si `footprint_m == 0.0`.
+
+    Règle d'échantillonnage : `n_aperture` fixe le pas physique de la grille
+    `dx = diameter_m / n_aperture` (voir `optics.aperture_grid`). Ce pas doit
+    rester petit devant les échelles physiques modélisées pour ne pas les
+    sous-résoudre : `dx ≲ phase_corr_length_m / 3` (écran de phase, sans quoi
+    le filtre gaussien de `random_phase_screen` est appliqué à un bruit déjà
+    trop grossier) et `dx ≲ footprint_m / 20` (empreinte, sans quoi son profil
+    gaussien est mal échantillonné). Avec un grand réflecteur physique
+    (`diameter_m` réaliste, ex. 2,2 m) et une petite empreinte/corrélation, il
+    faut donc augmenter `n_aperture` en conséquence (ex. plusieurs centaines).
     """
     X, Y, inside, dx = optics.aperture_grid(spec, n_aperture, pad_factor)
     ex, ey = optics.aperture_pol_vectors(spec, X, Y)
@@ -117,6 +132,8 @@ def synthesize_reflector_fields(
             feeds.q,
             defocus_m=feeds.defocus_m,
             extra_phase=extra_phase,
+            footprint_m=feeds.footprint_m,
+            footprint_magnification=feeds.footprint_magnification,
         )
         Fx, L, M = farfield.far_field_fft(scalar * ex, dx, spec.wavelength_m)
         Fy, _, _ = farfield.far_field_fft(scalar * ey, dx, spec.wavelength_m)

@@ -71,3 +71,29 @@ def test_feed_spec_phase_error_shared_rejects_negative_rms() -> None:
 def test_feed_spec_phase_error_shared_accepts_custom_value() -> None:
     feeds = FeedSpec(positions_m=[(0.0, 0.0)], q=2.0, phase_error_shared_rms_rad=1.5)
     assert feeds.phase_error_shared_rms_rad == pytest.approx(1.5)
+
+
+def test_feed_spec_footprint_defaults_to_zero() -> None:
+    feeds = FeedSpec(positions_m=[(0.0, 0.0)], q=2.0)
+    assert feeds.footprint_m == 0.0
+    assert feeds.footprint_magnification == 0.0
+
+
+def test_feed_spec_footprint_rejects_negative() -> None:
+    with pytest.raises(ValidationError):
+        FeedSpec(positions_m=[(0.0, 0.0)], q=2.0, footprint_m=-0.1)
+
+
+def test_feed_spec_footprint_magnification_accepts_negative() -> None:
+    # Signe libre : une magnification négative est un choix de convention
+    # valide (sens de balayage inversé), pas une erreur.
+    feeds = FeedSpec(positions_m=[(0.0, 0.0)], q=2.0, footprint_magnification=-48.0)
+    assert feeds.footprint_magnification == pytest.approx(-48.0)
+
+
+def test_feed_spec_footprint_accepts_custom_values() -> None:
+    feeds = FeedSpec(
+        positions_m=[(0.0, 0.0)], q=2.0, footprint_m=0.28, footprint_magnification=48.0
+    )
+    assert feeds.footprint_m == pytest.approx(0.28)
+    assert feeds.footprint_magnification == pytest.approx(48.0)

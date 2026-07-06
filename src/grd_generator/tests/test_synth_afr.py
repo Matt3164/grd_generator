@@ -4,6 +4,7 @@ import pytest
 from grd_generator.reflector import (
     FeedSpec,
     ReflectorSpec,
+    form_beam,
     hex_feed_positions,
     synthesize_reflector_fields,
 )
@@ -12,6 +13,40 @@ from grd_generator.schemas import UVGrid
 
 def _grid() -> UVGrid:
     return UVGrid(u_min=-14, u_max=14, v_min=-14, v_max=14, n_u=81, n_v=81)
+
+
+def _minus3db_width_deg(dbi: np.ndarray, grid: UVGrid) -> float:
+    """Largeur -3dB (deg) via un profil 1D interpolé le long de u, à v=v_peak.
+
+    Interpolation linéaire aux croisements pour une précision sous-pixel
+    (plus robuste qu'un simple comptage de pixels au-dessus du seuil pour
+    comparer des largeurs de lobe entre configurations différentes).
+    """
+    u_axis, _ = grid.axes()
+    iv, iu_raw = np.unravel_index(np.argmax(dbi), dbi.shape)
+    iu: int = int(iu_raw)
+    peak = dbi[iv, iu]
+    profile = dbi[iv, :]
+    half = peak - 3.0
+    above = profile >= half
+    left = iu
+    while left - 1 >= 0 and above[left - 1]:
+        left -= 1
+    right = iu
+    while right + 1 < len(profile) and above[right + 1]:
+        right += 1
+
+    def _cross(i0: int, i1: int) -> float:
+        y0, y1 = profile[i0], profile[i1]
+        u0, u1 = u_axis[i0], u_axis[i1]
+        if y1 == y0:
+            return float(u_axis[i0])
+        t = (half - y0) / (y1 - y0)
+        return float(u0 + t * (u1 - u0))
+
+    u_left = _cross(left - 1, left) if left > 0 else float(u_axis[left])
+    u_right = _cross(right, right + 1) if right < len(profile) - 1 else float(u_axis[right])
+    return u_right - u_left
 
 
 def test_centered_feed_beam_points_at_boresight() -> None:
@@ -271,3 +306,114 @@ def test_shared_phase_error_is_deterministic_given_same_spec_and_seed() -> None:
     for i in range(2):
         np.testing.assert_array_equal(co_a[i], co_b[i])
         np.testing.assert_array_equal(cross_a[i], cross_b[i])
+
+
+def test_footprint_zero_leaves_fields_unchanged() -> None:
+    # footprint_m=0 (défaut) : le champ doit être strictement identique à
+    # l'existant, qu'il soit omis ou explicitement à 0.
+    spec = ReflectorSpec(diameter_m=2.0, focal_length_m=2.0, freq_hz=20e9)
+    grid = _grid()
+    feeds_default = FeedSpec(positions_m=[(0.0, 0.0)], q=2.0)
+    feeds_explicit_zero = FeedSpec(
+        positions_m=[(0.0, 0.0)], q=2.0, footprint_m=0.0, footprint_magnification=48.0
+    )
+    co_default, cross_default = synthesize_reflector_fields(
+        spec, feeds_default, grid, n_aperture=64, pad_factor=4
+    )
+    co_zero, cross_zero = synthesize_reflector_fields(
+        spec, feeds_explicit_zero, grid, n_aperture=64, pad_factor=4
+    )
+    np.testing.assert_array_equal(co_default[0], co_zero[0])
+    np.testing.assert_array_equal(cross_default[0], cross_zero[0])
+
+
+def test_footprint_governs_elemental_lobe_width_not_diameter() -> None:
+    # Modèle deux échelles : sur un grand réflecteur D=2.2m avec une empreinte
+    # de 0.28m, la largeur -3dB élémentaire doit être gouvernée par
+    # l'empreinte (même ordre de grandeur qu'un disque plein D=0.28m, PAS par
+    # D=2.2m) et bien plus large que celle du disque plein D=2.2m.
+    #
+    # Note de calibrage : la comparaison au disque plein D=0.28m n'est PAS à
+    # ±20% comme une première estimation naïve le suggérait. L'empreinte est
+    # un taper gaussien pur (car F=1.2·D=2.64m est très grand devant
+    # footprint=0.28m, donc cos^q(ψ) est quasi constant sur l'empreinte,
+    # cf. `test_footprint_magnification_shifts_energy_centroid`) tandis que le
+    # disque plein D=0.28m combine un vrai taper cos^2(ψ) (F=0.336m,
+    # comparable à D) ET une troncature dure au bord. Un aperçu Fourier 1D
+    # (gaussien de FWHM amplitude D vs. cos^2 tronqué même diamètre) prédit un
+    # rapport de largeur -3dB théorique ≈0.62/1.15≈0.54, cohérent avec la
+    # mesure numérique (~0.59, tolérance ci-dessous [0.4, 0.9]) : la largeur
+    # de lobe est bien du même ordre de grandeur (gouvernée par l'empreinte),
+    # mais pas dans un rapport ±20% naïf entre deux tapers différents.
+    freq_hz = 20e9
+    grid = UVGrid(u_min=-20, u_max=20, v_min=-20, v_max=20, n_u=401, n_v=401)
+
+    spec_footprint = ReflectorSpec(diameter_m=2.2, focal_length_m=1.2 * 2.2, freq_hz=freq_hz)
+    feeds_footprint = FeedSpec(positions_m=[(0.0, 0.0)], q=2.0, footprint_m=0.28)
+    co_footprint, _ = synthesize_reflector_fields(
+        spec_footprint, feeds_footprint, grid, n_aperture=200, pad_factor=4
+    )
+    dbi_footprint = 10.0 * np.log10(np.maximum(np.abs(co_footprint[0]) ** 2, 1e-12))
+    width_footprint = _minus3db_width_deg(dbi_footprint, grid)
+
+    spec_small_disk = ReflectorSpec(diameter_m=0.28, focal_length_m=1.2 * 0.28, freq_hz=freq_hz)
+    feeds_small_disk = FeedSpec(positions_m=[(0.0, 0.0)], q=2.0)
+    co_small_disk, _ = synthesize_reflector_fields(
+        spec_small_disk, feeds_small_disk, grid, n_aperture=64, pad_factor=4
+    )
+    dbi_small_disk = 10.0 * np.log10(np.maximum(np.abs(co_small_disk[0]) ** 2, 1e-12))
+    width_small_disk = _minus3db_width_deg(dbi_small_disk, grid)
+
+    ratio_vs_small_disk = width_footprint / width_small_disk
+    assert 0.4 <= ratio_vs_small_disk <= 0.9
+
+    feeds_full_big_disk = FeedSpec(positions_m=[(0.0, 0.0)], q=2.0)
+    co_full_big, _ = synthesize_reflector_fields(
+        spec_footprint, feeds_full_big_disk, grid, n_aperture=200, pad_factor=4
+    )
+    dbi_full_big = 10.0 * np.log10(np.maximum(np.abs(co_full_big[0]) ** 2, 1e-12))
+    width_full_big = _minus3db_width_deg(dbi_full_big, grid)
+
+    assert width_footprint > 2.0 * width_full_big
+
+
+def test_beam_formed_recombines_footprints_into_full_aperture() -> None:
+    # LE test de valeur de la feature : un cluster de feeds dont les
+    # empreintes (grâce à la magnification) pavent une zone bien plus large
+    # que l'empreinte seule doit, via le beam formé (filtre adapté), recombiner
+    # cette pleine ouverture effective -> largeur -3dB nettement plus fine
+    # (facteur >= 2) que celle d'un élément seul.
+    spec = ReflectorSpec(diameter_m=2.2, focal_length_m=1.2 * 2.2, freq_hz=20e9)
+    positions = hex_feed_positions(pitch_m=0.004, n_feeds=19, focal_radius_m=0.04)
+    feeds = FeedSpec(
+        positions_m=positions, q=2.0, footprint_m=0.28, footprint_magnification=48.0
+    )
+    grid = UVGrid(u_min=-6, u_max=6, v_min=-6, v_max=6, n_u=241, n_v=241)
+
+    co, _ = synthesize_reflector_fields(spec, feeds, grid, n_aperture=200, pad_factor=4)
+    assert len(co) == 19
+
+    dbi_element = 10.0 * np.log10(np.maximum(np.abs(co[0]) ** 2, 1e-12))
+    width_element = _minus3db_width_deg(dbi_element, grid)
+
+    beam = form_beam(co, grid, (0.0, 0.0))
+    dbi_beam = 10.0 * np.log10(np.maximum(np.abs(beam) ** 2, 1e-12))
+    width_beam = _minus3db_width_deg(dbi_beam, grid)
+
+    assert width_element > 2.0 * width_beam
+
+
+def test_footprint_truncation_at_edge_does_not_error_and_stays_nonzero() -> None:
+    # Magnification énorme (grande devant le pitch/décalage feed réaliste) :
+    # l'empreinte est repoussée bien hors du disque physique, largement
+    # tronquée par le masque `inside`. Le champ doit rester fini et non nul
+    # (pas d'erreur, cf. tâche), même très atténué.
+    spec = ReflectorSpec(diameter_m=2.2, focal_length_m=1.2 * 2.2, freq_hz=20e9)
+    feeds = FeedSpec(
+        positions_m=[(0.02, 0.0)], q=2.0, footprint_m=0.28, footprint_magnification=100.0
+    )
+    grid = UVGrid(u_min=-6, u_max=6, v_min=-6, v_max=6, n_u=41, n_v=41)
+    co, cross = synthesize_reflector_fields(spec, feeds, grid, n_aperture=200, pad_factor=2)
+    assert np.all(np.isfinite(co[0]))
+    assert np.all(np.isfinite(cross[0]))
+    assert np.any(np.abs(co[0]) > 0.0)
