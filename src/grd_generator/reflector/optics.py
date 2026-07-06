@@ -18,8 +18,26 @@ déplacement axial δz du feed introduit une différence de marche
 constante additive près référencée à ψ=0 (le long de l'axe, différence de
 marche nulle par convention), la phase correspondante est k·δz·(1 − cosψ).
 Ce terme s'ajoute au tilt de dépointage existant. Il ne dépend que de ψ (pas
-de la position du feed dans le plan focal) : il étale symétriquement le
-pattern par feed autour de sa direction pointée, sans la déplacer.
+de la position du feed dans le plan focal) : autour du centre de l'ouverture,
+il étale symétriquement le pattern par feed autour de sa direction pointée,
+sans la déplacer.
+
+Squint sur ouverture offset : ψ dépend de ρ = ‖(X,Y)‖ mesuré depuis l'axe du
+paraboloïde parent, pas depuis le centre du disque d'ouverture, qui est lui
+centré en Y₀ = `aperture_center_y_m` ≠ 0. Le développement de (1 − cosψ)
+autour de Y₀ contient donc, en plus du terme quadratique attendu, une
+composante plane a + b·X + c·Y (essentiellement un gradient en Y
+proportionnel à Y₀) qui se comporte exactement comme le tilt de dépointage :
+le faisceau part hors zone au lieu de s'étaler. Ce squint est un effet
+géométrique réel d'un feed axialement déplacé devant un réflecteur offset,
+mais ce n'est pas l'effet modélisé ici : `defocus_m` est un bouton
+phénoménologique d'étalement pur, et le pointage doit rester gouverné par la
+seule position transverse (δx, δy) du feed (dans un vrai design, le cluster
+défocalisé est repositionné/repointé pour recentrer la couverture).
+`aperture_field` retire donc, aux moindres carrés sur le
+disque d'ouverture, le plan a + b·X + c·Y ajusté à `k·δz·(1 − cosψ)` avant de
+l'ajouter à la phase ; le résidu ne contient plus que l'étalement symétrique
+recherché.
 """
 
 import numpy as np
@@ -55,6 +73,22 @@ def illumination_angle(X: FloatArray, Y: FloatArray, focal_length_m: float) -> F
     return angle
 
 
+def _fit_plane(
+    X: FloatArray, Y: FloatArray, values: FloatArray, inside: NDArray[np.bool_]
+) -> FloatArray:
+    """Plan a + b·X + c·Y ajusté aux moindres carrés sur `inside`, évalué sur toute la grille.
+
+    Utilisé pour retirer la composante de dépointage artificielle qu'introduit
+    le terme de defocus sur une ouverture offset (voir docstring du module).
+    """
+    ones = np.ones(int(inside.sum()))
+    design = np.column_stack((ones, X[inside], Y[inside]))
+    coeffs, *_ = np.linalg.lstsq(design, values[inside], rcond=None)
+    a, b, c = coeffs
+    plane: FloatArray = a + b * X + c * Y
+    return plane
+
+
 def aperture_field(
     spec: ReflectorSpec,
     feed_xy: tuple[float, float],
@@ -67,15 +101,27 @@ def aperture_field(
     """Champ scalaire d'ouverture pour un feed : taper cos^q(ψ) + tilt + defocus.
 
     `defocus_m` (δz, >0 = feed reculé) ajoute la phase quadratique
-    `k·δz·(1 − cosψ)` (voir docstring du module) à la phase de tilt existante.
-    Avec `defocus_m=0.0`, `1 − cos(0)` = 0 : le champ est strictement inchangé.
+    `k·δz·(1 − cosψ)` (voir docstring du module) à la phase de tilt existante,
+    après en avoir retiré la composante plane a + b·X + c·Y ajustée aux
+    moindres carrés sur le disque d'ouverture (`inside`). Sans ce retrait, le
+    terme de defocus dépointe le faisceau sur une ouverture offset au lieu de
+    seulement l'étaler symétriquement (squint, choix de modélisation — cf.
+    docstring du module) ; la constante `a` du plan est sans effet physique
+    (elle disparaît dans `exp(1j·phase)` relatif) mais la retirer avec le
+    reste du plan ne coûte rien.
+    Avec `defocus_m=0.0`, le champ est strictement inchangé (early-out : pas
+    de résolution moindres carrés à payer).
     """
     psi = illumination_angle(X, Y, spec.focal_length_m)
     amp = np.cos(psi) ** q
     k = 2.0 * np.pi / spec.wavelength_m
     dxf, dyf = feed_xy
     tilt = -k * spec.beam_deviation_factor * (dxf * X + dyf * Y) / spec.focal_length_m
-    defocus_phase = k * defocus_m * (1.0 - np.cos(psi))
+    if defocus_m == 0.0:
+        defocus_phase = np.zeros_like(X)
+    else:
+        raw_defocus_phase = k * defocus_m * (1.0 - np.cos(psi))
+        defocus_phase = raw_defocus_phase - _fit_plane(X, Y, raw_defocus_phase, inside)
     field: ComplexArray = (inside * amp * np.exp(1j * (tilt + defocus_phase))).astype(
         np.complex128
     )
