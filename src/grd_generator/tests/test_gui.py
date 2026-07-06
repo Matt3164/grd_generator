@@ -68,3 +68,20 @@ def test_build_result_is_reproducible() -> None:
     a = build_result(**kw)  # type: ignore[arg-type]
     b = build_result(**kw)  # type: ignore[arg-type]
     assert np.allclose(a.fields, b.fields)
+
+
+def test_reflector_studio_pitch_spinbox_accepts_millimeters() -> None:
+    """Régression : le spinbox pitch (décimales=3) doit accepter 0.004 m sans arrondi."""
+    import os
+
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    os.environ.setdefault("MPLBACKEND", "Agg")
+    from PyQt6.QtWidgets import QApplication
+
+    from grd_generator.gui import ReflectorStudio
+
+    _app = QApplication.instance() or QApplication([])
+    studio = ReflectorStudio(n_u=21, n_v=21)
+    studio._pitch.setValue(0.004)
+    assert studio._pitch.value() == 0.004
+    studio.close()

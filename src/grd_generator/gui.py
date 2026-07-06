@@ -253,8 +253,11 @@ class PatternStudio(QMainWindow):  # type: ignore[misc]
 
         self.generate()
 
-    def _dspin(self, lo: float, hi: float, val: float, step: float) -> QDoubleSpinBox:
+    def _dspin(
+        self, lo: float, hi: float, val: float, step: float, decimals: int = 2
+    ) -> QDoubleSpinBox:
         s = QDoubleSpinBox()
+        s.setDecimals(decimals)
         s.setRange(lo, hi)
         s.setSingleStep(step)
         s.setValue(val)
@@ -391,7 +394,7 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         self._offset = self._dspin(0.0, 5.0, 0.0, 0.05)
         self._freq_ghz = self._dspin(1.0, 100.0, 20.0, 1.0)
         self._q = self._dspin(0.5, 20.0, 2.0, 0.5)
-        self._pitch = self._dspin(0.002, 0.5, 0.03, 0.001)
+        self._pitch = self._dspin(0.002, 0.5, 0.03, 0.001, decimals=3)
         self._n_feeds = self._ispin(1, 127, 7)
         self._defocus = self._dspin(-5.0, 5.0, 0.0, 0.1)
         # bornes zone : [6, 14]° conforme à ServiceZone
@@ -454,8 +457,11 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
 
         self.generate()
 
-    def _dspin(self, lo: float, hi: float, val: float, step: float) -> QDoubleSpinBox:
+    def _dspin(
+        self, lo: float, hi: float, val: float, step: float, decimals: int = 2
+    ) -> QDoubleSpinBox:
         s = QDoubleSpinBox()
+        s.setDecimals(decimals)
         s.setRange(lo, hi)
         s.setSingleStep(step)
         s.setValue(val)
