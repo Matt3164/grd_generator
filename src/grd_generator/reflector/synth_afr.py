@@ -18,15 +18,25 @@ def hex_feed_positions(
     return hex_centers_uv((0.0, 0.0), focal_radius_m, n_feeds, pitch_m)
 
 
-def form_beam(
-    co_fields: list[ComplexField], grid: UVGrid, target_uv: tuple[float, float]
-) -> ComplexField:
-    """Beam formé par filtre adapté (conjugate beamforming) vers `target_uv`.
+def beamform_weights(
+    co_fields: list[ComplexField],
+    grid: UVGrid,
+    target_uv: tuple[float, float],
+    *,
+    reference_strongest: bool = True,
+) -> NDArray[np.complex128]:
+    """Poids de filtre adapté (conjugate beamforming) vers `target_uv`.
 
-    Poids `wᵢ = conj(Eᵢ(cible))` normalisés en norme L2 unité ; champ combiné
-    `B(u,v) = Σᵢ wᵢ·Eᵢ(u,v)`. Par Cauchy-Schwarz, `|B(cible)|² = Σᵢ|Eᵢ(cible)|²`,
-    donc la crête du beam touche l'enveloppe max co-pol au point visé. La cible
-    est projetée sur la cellule de grille la plus proche.
+    Poids `wᵢ = conj(Eᵢ(cible))` normalisés en norme L2 unité (`Σ|wᵢ|²=1`) ; la
+    cible est projetée sur la cellule de grille la plus proche, comme
+    `form_beam`. Norme nulle (cible hors de toute couverture) → poids nuls.
+
+    Si `reference_strongest`, applique un déphasage global `w *= exp(-i·arg(wⱼ))`
+    où `j = argmax|wᵢ|`, de sorte que le feed le plus fort ait une phase nulle
+    (réel positif). La phase globale d'un jeu de poids de beamforming est
+    physiquement arbitraire (elle ne change pas `|beam|`), donc ce
+    référencement ne fait que stabiliser un affichage (ex. constellation de
+    beamweights) sans changer la physique.
     """
     stack = np.stack(co_fields)  # (n_feeds, n_v, n_u)
     u_axis, v_axis = grid.axes()
@@ -36,10 +46,47 @@ def form_beam(
     samples = stack[:, iv, iu]  # Eᵢ(cible), forme (n_feeds,)
     norm = float(np.sqrt(np.sum(np.abs(samples) ** 2)))
     if norm == 0.0:
-        return np.zeros_like(stack[0])
+        return np.zeros(len(co_fields), dtype=np.complex128)
     weights = np.conj(samples) / norm
+    if reference_strongest:
+        j = int(np.argmax(np.abs(weights)))
+        weights = weights * np.exp(-1j * np.angle(weights[j]))
+    return np.asarray(weights, dtype=np.complex128)
+
+
+def form_beam(
+    co_fields: list[ComplexField], grid: UVGrid, target_uv: tuple[float, float]
+) -> ComplexField:
+    """Beam formé par filtre adapté (conjugate beamforming) vers `target_uv`.
+
+    Poids `wᵢ = conj(Eᵢ(cible))` normalisés en norme L2 unité (voir
+    `beamform_weights`, appelée ici avec `reference_strongest=False` pour ne
+    pas altérer la phase du champ retourné) ; champ combiné
+    `B(u,v) = Σᵢ wᵢ·Eᵢ(u,v)`. Par Cauchy-Schwarz, `|B(cible)|² = Σᵢ|Eᵢ(cible)|²`,
+    donc la crête du beam touche l'enveloppe max co-pol au point visé.
+    """
+    stack = np.stack(co_fields)  # (n_feeds, n_v, n_u)
+    weights = beamform_weights(co_fields, grid, target_uv, reference_strongest=False)
     beam: ComplexField = np.tensordot(weights, stack, axes=([0], [0])).astype(np.complex128)
     return beam
+
+
+def directivity_barycenters(co_fields: list[ComplexField], grid: UVGrid) -> NDArray[np.float64]:
+    """Barycentre pondéré en puissance (u,v) du co-pol de chaque feed.
+
+    `cu = Σ(|E|²·U)/Σ|E|²`, idem `cv`, sur la grille (u,v) en cosinus
+    directeurs. Renvoie un tableau `(n_feeds, 2)`. Puissance nulle → `(0,0)`.
+    """
+    gu, gv = grid.meshgrid()
+    out = np.zeros((len(co_fields), 2), dtype=np.float64)
+    for i, field in enumerate(co_fields):
+        power = np.abs(field) ** 2
+        total = float(np.sum(power))
+        if total == 0.0:
+            continue
+        out[i, 0] = float(np.sum(power * gu) / total)
+        out[i, 1] = float(np.sum(power * gv) / total)
+    return out
 
 
 def dereference_phase(

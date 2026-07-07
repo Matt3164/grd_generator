@@ -3,6 +3,8 @@ import numpy as np
 from grd_generator.reflector import (
     FeedSpec,
     ReflectorSpec,
+    beamform_weights,
+    directivity_barycenters,
     form_beam,
     hex_feed_positions,
     synthesize_reflector_fields,
@@ -74,3 +76,87 @@ def test_zero_field_returns_zeros() -> None:
     zeros = [np.zeros((grid.n_v, grid.n_u), dtype=np.complex128)]
     beam = form_beam(zeros, grid, (0.0, 0.0))
     assert np.all(beam == 0.0)
+
+
+def test_beamform_weights_l2_norm_is_unity() -> None:
+    co = _fields()
+    grid = _grid()
+    w = beamform_weights(co, grid, (0.01, -0.02))
+    assert np.isclose(float(np.sum(np.abs(w) ** 2)), 1.0)
+
+
+def test_beamform_weights_matches_conjugate_field_up_to_global_phase() -> None:
+    # wᵢ = conj(Eᵢ(cible)) normalisés ; le référencement (`reference_strongest`)
+    # ne fait qu'ajouter un déphasage global commun à tous les i.
+    co = _fields()
+    grid = _grid()
+    target = (0.01, -0.02)
+    u, v = grid.axes()
+    iu = int(np.argmin(np.abs(u - target[0])))
+    iv = int(np.argmin(np.abs(v - target[1])))
+    samples = np.stack(co)[:, iv, iu]
+    raw = np.conj(samples) / np.sqrt(np.sum(np.abs(samples) ** 2))
+    w = beamform_weights(co, grid, target, reference_strongest=True)
+    assert np.allclose(np.abs(w), np.abs(raw))
+    ratio = w / raw
+    assert np.allclose(ratio, ratio[0])
+
+
+def test_beamform_weights_reference_strongest_max_feed_is_real_positive() -> None:
+    co = _fields()
+    grid = _grid()
+    w = beamform_weights(co, grid, (0.01, -0.02), reference_strongest=True)
+    j = int(np.argmax(np.abs(w)))
+    assert abs(w[j].imag) < 1e-9
+    assert w[j].real > 0.0
+
+
+def test_beamform_weights_zero_field_returns_zeros() -> None:
+    grid = _grid()
+    zeros = [np.zeros((grid.n_v, grid.n_u), dtype=np.complex128)]
+    w = beamform_weights(zeros, grid, (0.0, 0.0))
+    assert np.all(w == 0.0)
+    assert w.shape == (1,)
+
+
+def test_form_beam_matches_pre_refactor_reference_implementation() -> None:
+    # Vérifie que le refactor via `beamform_weights(reference_strongest=False)`
+    # ne change pas le champ combiné, comparé à l'ancienne implémentation inline.
+    co = _fields()
+    grid = _grid()
+    target = (0.01, -0.02)
+    stack = np.stack(co)
+    u, v = grid.axes()
+    iu = int(np.argmin(np.abs(u - target[0])))
+    iv = int(np.argmin(np.abs(v - target[1])))
+    samples = stack[:, iv, iu]
+    norm = float(np.sqrt(np.sum(np.abs(samples) ** 2)))
+    reference_weights = np.conj(samples) / norm
+    reference_beam = np.tensordot(reference_weights, stack, axes=([0], [0]))
+    beam = form_beam(co, grid, target)
+    assert np.allclose(np.abs(beam), np.abs(reference_beam))
+
+
+def test_directivity_barycenters_shape() -> None:
+    co = _fields()
+    grid = _grid()
+    centers = directivity_barycenters(co, grid)
+    assert centers.shape == (len(co), 2)
+
+
+def test_directivity_barycenters_peak_matches_known_point() -> None:
+    grid = _grid()
+    u, v = grid.axes()
+    iu0, iv0 = 20, 60
+    field = np.zeros((grid.n_v, grid.n_u), dtype=np.complex128)
+    field[iv0, iu0] = 1.0 + 0j
+    centers = directivity_barycenters([field], grid)
+    assert np.isclose(centers[0, 0], u[iu0])
+    assert np.isclose(centers[0, 1], v[iv0])
+
+
+def test_directivity_barycenters_zero_power_returns_origin() -> None:
+    grid = _grid()
+    zeros = np.zeros((grid.n_v, grid.n_u), dtype=np.complex128)
+    centers = directivity_barycenters([zeros], grid)
+    assert np.allclose(centers[0], (0.0, 0.0))

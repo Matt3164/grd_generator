@@ -16,6 +16,7 @@ from typing import Any
 import numpy as np
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
+from matplotlib.patches import Circle
 from numpy.typing import NDArray
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
@@ -59,7 +60,9 @@ from grd_generator.reflector import (
     FeedSpec,
     ReflectorSpec,
     ServiceZone,
+    beamform_weights,
     dereference_phase,
+    directivity_barycenters,
     form_beam,
     hex_feed_positions,
     synthesize_reflector_fields,
@@ -88,6 +91,11 @@ _REFLECTOR_UV_HALF_WIDTH = 0.25
 _ZOOM_HALF_WIDTH_DEG = 2.0
 _ZOOM_HALF_WIDTH_UV = math.sin(math.radians(_ZOOM_HALF_WIDTH_DEG))
 _ZOOM_N = 81
+
+# Panneau "Beamweights" (ReflectorStudio, axe 3) : rayon max de disque et longueur
+# d'aiguille, en cosinus directeurs — fraction fixe du panneau (extent ±0.25),
+# indépendante de l'amplitude/nombre de feeds pour rester lisible.
+_BEAMWEIGHT_R_MAX = 0.02
 
 
 @dataclass(frozen=True)
@@ -416,7 +424,6 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         self._cb_dir: Any = None
         self._cb_phase: Any = None
         self._cb_env: Any = None
-        self._cb_env_max: Any = None
         self._cb_beam_dir: Any = None
         self._cb_beam_zoom: Any = None
         self._target_uv: tuple[float, float] = (0.0, 0.0)  # cible du beam (cosinus directeurs)
@@ -577,13 +584,7 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         self._axes[2].set_xlabel("u")
         self._axes[2].set_ylabel("v")
         draw_service_zone_uv(self._axes[2], r.zone, to_direction_cosine=True)
-        # Enveloppe max par élément (festonnage réel, pas de recombinaison) sur les axes (u,v)
-        env_max = envelope_max_dbi(np.stack(r.co_fields))
-        self._cb_env_max = _draw_uv_map(self._axes[3], r.grid, env_max, "Enveloppe max par élément")
-        self._axes[3].set_xlabel("u")
-        self._axes[3].set_ylabel("v")
-        draw_service_zone_uv(self._axes[3], r.zone, to_direction_cosine=True)
-        # Beam formé vers la cible (filtre adapté) : directivité + phase
+        # Beamweights (axe 3) + beam formé vers la cible (filtre adapté) : directivité + phase
         self._draw_beam(clear=False)
         self._figure.tight_layout()
         self._canvas.draw_idle()  # type: ignore[no-untyped-call]
@@ -635,8 +636,47 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         self._zoom_cache_result = result
         return result
 
+    def _draw_beamweights(self) -> None:
+        """Constellation de beamweights vers `self._target_uv` (axe 3).
+
+        Un glyphe par feed, placé à son barycentre de directivité
+        (`directivity_barycenters`) : disque de rayon ∝ |wᵢ| (poids de
+        beamforming — filtre adapté, `beamform_weights`), aiguille de longueur
+        fixe pointant vers `arg(wᵢ)` (déjà référencée au feed le plus fort, qui
+        pointe donc vers +u). Ne dépend que des champs déjà synthétisés + la
+        cible courante : pas de re-synthèse, recalculé à chaque appel (contrairement
+        au zoom du beam formé, qui est mémorisé).
+        """
+        assert self._afr_result is not None
+        r = self._afr_result
+        weights = beamform_weights(list(r.co_fields), r.grid, self._target_uv)
+        centers = directivity_barycenters(list(r.co_fields), r.grid)
+        max_abs = float(np.max(np.abs(weights))) if weights.size else 0.0
+        color = "0.25"
+        for (cu, cv), w in zip(centers, weights, strict=True):
+            amp = float(np.abs(w))
+            if amp == 0.0:
+                continue
+            radius = _BEAMWEIGHT_R_MAX * (amp / max_abs)
+            self._axes[3].add_patch(
+                Circle((cu, cv), radius, fill=False, edgecolor=color, linewidth=1.2)
+            )
+            theta = float(np.angle(w))
+            nu = cu + _BEAMWEIGHT_R_MAX * math.cos(theta)
+            nv = cv + _BEAMWEIGHT_R_MAX * math.sin(theta)
+            self._axes[3].plot([cu, nu], [cv, nv], color=color, linewidth=1.2)
+        self._axes[3].set_xlim(-_REFLECTOR_UV_HALF_WIDTH, _REFLECTOR_UV_HALF_WIDTH)
+        self._axes[3].set_ylim(-_REFLECTOR_UV_HALF_WIDTH, _REFLECTOR_UV_HALF_WIDTH)
+        self._axes[3].set_aspect("equal")
+        self._axes[3].set_xlabel("u")
+        self._axes[3].set_ylabel("v")
+        self._axes[3].set_title("Beamweights (disque=|w|, trait=phase)")
+        # Fond blanc (pas de pcolormesh ici, contrairement aux autres panneaux) :
+        # le blanc par défaut de `draw_service_zone_uv` y serait invisible.
+        draw_service_zone_uv(self._axes[3], r.zone, color="0.6", to_direction_cosine=True)
+
     def _draw_beam(self, *, clear: bool = True) -> None:
-        """Beam formé par filtre adapté vers `self._target_uv` (axe 4) + zoom (axe 5).
+        """Beamweights (axe 3) + beam formé par filtre adapté (axe 4) + zoom (axe 5).
 
         Le beam pleine ouverture a une crête ~λ/D_physique de large : sur la
         grille large ±0.25/81px (cosinus directeurs) elle ne fait qu'un pixel
@@ -646,15 +686,17 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         """
         assert self._afr_result is not None
         r = self._afr_result
-        beam = form_beam(list(r.co_fields), r.grid, self._target_uv)
-        dbi = 10.0 * np.log10(np.maximum(np.abs(beam) ** 2, 1e-12))
         if clear:
+            self._axes[3].clear()
             if self._cb_beam_dir is not None:
                 self._cb_beam_dir.remove()
             if self._cb_beam_zoom is not None:
                 self._cb_beam_zoom.remove()
             self._axes[4].clear()
             self._axes[5].clear()
+        self._draw_beamweights()
+        beam = form_beam(list(r.co_fields), r.grid, self._target_uv)
+        dbi = 10.0 * np.log10(np.maximum(np.abs(beam) ** 2, 1e-12))
         tu, tv = self._target_uv
         peak_dbi = float(dbi.max())
         title = f"Beam formé ({tu:.2f}, {tv:.2f}) — crête {peak_dbi:.1f} dBi"
@@ -842,8 +884,9 @@ faisceau <i>formé</i> vers une cible.</p>
     en haut à gauche.</td></tr>
 <tr><td><b>Cible du beam (clic)</b></td>
     <td>Cliquer sur n'importe quelle carte large (u,v) fixe la coordonnée cible
-    (u,v) — cosinus directeurs — du beam formé par filtre adapté (rangée du bas)
-    — directivité (axe 4) et zoom (axe 5), qui suivent tous les deux le clic.</td></tr>
+    (u,v) — cosinus directeurs — du beam formé par filtre adapté : constellation
+    de beamweights (axe 3), directivité (axe 4) et zoom (axe 5), qui suivent tous
+    les trois le clic.</td></tr>
 </table>
 
 <h3>Détail de la simulation</h3>
@@ -861,6 +904,15 @@ géométrie offset.</li>
 <li><b>Beam formé</b> : filtre adapté (conjugate beamforming), poids
 wᵢ = conj(Eᵢ(cible)) normalisés en norme L2 ⇒ la crête touche l'enveloppe max
 par élément au point visé.</li>
+<li><b>Beamweights</b> (axe 3) : un glyphe par feed, positionné au barycentre de
+directivité de son pattern. Le <b>disque</b> a un rayon proportionnel à |wᵢ|, le
+poids de beamforming du feed vers la cible courante — plus le feed contribue au
+beam formé, plus son disque est grand. Le <b>trait</b> (aiguille de longueur
+fixe) donne la phase de ce poids, référencée au feed le plus fort (qui pointe
+donc toujours vers +u, à droite) — la phase globale d'un jeu de poids étant
+physiquement arbitraire, ce référencement stabilise l'affichage sans changer la
+physique. Se recalcule à chaque clic, sans re-synthèse (contrairement au panneau
+zoom).</li>
 <li><b>Beam formé — zoom</b> : la crête du beam formé pleine ouverture est large de
 ~λ/D<sub>physique</sub> (ex. ~0,43° à 20 GHz/2 m) — souvent moins large qu'un
 pixel de la grille d'affichage ±0,25/81px (cosinus directeurs), donc invisible
@@ -869,11 +921,10 @@ speckle. Le panneau zoom (axe 5) ré-échantillonne les champs sur une fenêtre
 ±sin(2°)≈±0,035 (cosinus directeurs) centrée sur la cible pour résoudre cette
 crête ; mémorisé par (cible, paramètres), il ne recalcule (coût ~4s) que si
 l'un des deux change.</li>
-<li><b>Enveloppes</b> : « Enveloppe MRC (beamforming idéal) » = RSS
-10·log₁₀ Σ|Eᵢ|² (directivité max <i>atteignable</i> par recombinaison
-cohérente, lisse) ; « Enveloppe max par élément » = max des faisceaux
-individuels sans recombinaison (montre le festonnage réel). Comparer une cible
-de gain à la seconde, pas à la première.</li>
+<li><b>Enveloppe MRC</b> (axe 2) : RSS 10·log₁₀ Σ|Eᵢ|², la directivité max
+<i>atteignable</i> par recombinaison cohérente (beamforming idéal, lisse) —
+une borne supérieure, pas ce que montre un beam formé réel vers un point donné
+(voir « Beam formé » ci-dessus).</li>
 <li><b>Phase dé-référencée</b> : le panneau phase du feed (axe 1) retire, pour
 l'affichage seulement, la porteuse linéaire exp(-i·k·Y₀·v) due au centre
 d'ouverture décalé Y₀ (offset clearance + D/2), v étant ici le cosinus
