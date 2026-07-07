@@ -19,6 +19,7 @@ from numpy.typing import NDArray
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QComboBox,
     QDoubleSpinBox,
     QFileDialog,
@@ -176,6 +177,7 @@ def build_reflector_result(
     defocus_m: float = 0.0,
     n_aperture: int = 128,
     pad_factor: int = 4,
+    centered_aperture: bool = False,
 ) -> ReflectorResult:
     """Construit le résultat AFR (pur, sans Qt) depuis les paramètres de l'IHM."""
     spec = ReflectorSpec(
@@ -183,6 +185,7 @@ def build_reflector_result(
         focal_length_m=f_over_d * diameter_m,
         offset_clearance_m=offset_clearance_m,
         freq_hz=freq_ghz * 1e9,
+        centered_aperture=centered_aperture,
     )
     feeds = FeedSpec(
         positions_m=hex_feed_positions(pitch_m, n_feeds, focal_radius_m=10.0 * pitch_m),
@@ -423,6 +426,8 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         self._diameter = self._dspin(0.1, 25.0, 0.28, 0.1)
         self._f_over_d = self._dspin(0.5, 4.0, 1.2, 0.1)
         self._offset = self._dspin(0.0, 5.0, 0.15, 0.05)
+        self._centered = QCheckBox()
+        self._centered.setChecked(True)
         self._freq_ghz = self._dspin(1.0, 100.0, 20.0, 1.0)
         self._q = self._dspin(0.5, 20.0, 2.0, 0.5)
         self._pitch = self._dspin(0.002, 0.5, 0.03, 0.001, decimals=3)
@@ -445,6 +450,7 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         rf.addRow("Diamètre (m)", self._diameter)
         rf.addRow("F/D", self._f_over_d)
         rf.addRow("Offset clearance (m)", self._offset)
+        rf.addRow("Réflecteur centré (non-offset)", self._centered)
         rf.addRow("Fréquence (GHz)", self._freq_ghz)
         feed_grp = QGroupBox("Réseau de feeds")
         ff = QFormLayout(feed_grp)
@@ -530,6 +536,7 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
                     zone_radius_deg=self._zone_radius.value(),
                     grid=grid,
                     defocus_m=self._defocus.value(),
+                    centered_aperture=self._centered.isChecked(),
                 )
             except ValueError as exc:
                 QMessageBox.warning(self, "Génération impossible", str(exc))
@@ -581,6 +588,7 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
             float(self._n_feeds.value()),
             self._defocus.value(),
             self._zone_radius.value(),
+            float(self._centered.isChecked()),
         )
 
     def _zoomed_beam_result(self) -> ReflectorResult:
@@ -609,6 +617,7 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
             zone_radius_deg=self._zone_radius.value(),
             grid=zoom_grid,
             defocus_m=self._defocus.value(),
+            centered_aperture=self._centered.isChecked(),
         )
         self._zoom_cache_key = key
         self._zoom_cache_result = result
@@ -719,6 +728,7 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
             n_feeds=self._n_feeds.value(),
             zone_radius_deg=self._zone_radius.value(),
             defocus_m=self._defocus.value(),
+            centered_aperture=self._centered.isChecked(),
         )
 
     def _on_export_grd(self) -> None:
@@ -773,7 +783,16 @@ faisceau <i>formé</i> vers une cible.</p>
     l'illumination du bord.</td></tr>
 <tr><td><b>Offset clearance (m)</b></td>
     <td>Dégagement vertical de l'ouverture sous l'axe du paraboloïde parent.
-    Centre de l'ouverture projetée : <i>clearance</i> + <i>D</i>/2.</td></tr>
+    Centre de l'ouverture projetée : <i>clearance</i> + <i>D</i>/2. Ignoré si
+    « Réflecteur centré » est coché.</td></tr>
+<tr><td><b>Réflecteur centré (non-offset)</b></td>
+    <td>Coché (défaut) : ouverture centrée sur l'axe (Y₀=0), réflecteur
+    front-fed axisymétrique — patterns radiaux symétriques ; sous defocus, la
+    coupe far-field reste symétrique haut/bas, et augmenter <i>q</i> réduit
+    bien les lobes secondaires (taper normal). Décoché : ouverture offset
+    réelle (Y₀ = <i>clearance</i> + <i>D</i>/2 ≠ 0) — le defocus produit de la
+    coma (asymétrie haut/bas, « oreilles »), et augmenter <i>q</i> peut au
+    contraire remonter les lobes secondaires (illumination déséquilibrée).</td></tr>
 <tr><td><b>Fréquence (GHz)</b></td>
     <td>Fréquence d'exploitation. Longueur d'onde λ = c/f. Intervient dans la
     largeur de faisceau (λ/<i>D</i>) et le gradient de phase.</td></tr>
@@ -839,6 +858,19 @@ replie en rayures (moiré) sur la grille d'affichage grossière. Les champs
 utilisés pour le beamforming et les exports GRD restent inchangés (vérité
 physique).</li>
 </ul>
+
+<h3>Convention (u,v)</h3>
+<p>La grille d'affichage (les six cartes du studio) est en <b>degrés</b> :
+(u,v) sont des angles, pas des cosinus directeurs. Le champ lointain, lui, est
+calculé et stocké en cosinus directeurs (l,m) = (sinθcosφ, sinθsinφ) (voir
+« Far-field » ci-dessus) — la grille (u,v) en degrés n'est qu'un
+rééchantillonnage pour l'affichage. L'export <code>.grd</code> suit la
+convention GRASP <b>IGRID=1</b> : ses bornes ne sont pas les degrés (u,v)
+eux-mêmes mais <code>sin(rad(u,v))</code>, c'est-à-dire les cosinus directeurs
+correspondants. La grille interne étant uniforme en degrés et exportée comme
+uniforme en cosinus directeurs, cette approximation est exacte aux petits
+angles et introduit un écart d'échantillonnage d'environ 1&nbsp;% à
+±14°.</p>
 
 <h3>Exports</h3>
 <ul>

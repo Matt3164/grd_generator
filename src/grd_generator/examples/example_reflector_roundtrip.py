@@ -70,6 +70,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--diameter-m", type=float, default=2.0)
     parser.add_argument("--f-over-d", type=float, default=1.2)
     parser.add_argument("--offset-m", type=float, default=0.0)
+    parser.add_argument(
+        "--centered",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Ouverture centrée sur l'axe (axisymétrique) au lieu de l'offset réel (défaut).",
+    )
     parser.add_argument("--freq-ghz", type=float, default=20.0)
     parser.add_argument("--q", type=float, default=2.0)
     parser.add_argument("--pitch-m", type=float, default=0.03)
@@ -114,6 +120,7 @@ def generate_and_export_grd(args: argparse.Namespace, grd_dir: Path) -> int:
         zone_radius_deg=args.zone_radius_deg,
         grid=grid,
         defocus_m=args.defocus_m,
+        centered_aperture=args.centered,
     )
     grd_dir.mkdir(parents=True, exist_ok=True)
     freq_hz = args.freq_ghz * 1e9

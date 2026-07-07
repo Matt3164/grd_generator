@@ -79,6 +79,7 @@ def simulation_params_dict(
     n_feeds: int,
     zone_radius_deg: float,
     defocus_m: float = 0.0,
+    centered_aperture: bool = False,
 ) -> dict[str, Any]:
     """Dict sérialisable JSON des paramètres de simulation (focale dérivée incluse)."""
     return {
@@ -92,4 +93,5 @@ def simulation_params_dict(
         "n_feeds": n_feeds,
         "zone_radius_deg": zone_radius_deg,
         "defocus_m": defocus_m,
+        "centered_aperture": centered_aperture,
     }

@@ -59,6 +59,17 @@ def test_build_reflector_result_with_defocus() -> None:
     assert res.co_fields[0].shape == (41, 41)
 
 
+def test_build_reflector_result_centered_aperture_true_runs() -> None:
+    grid = UVGrid(u_min=-14, u_max=14, v_min=-14, v_max=14, n_u=41, n_v=41)
+    res = build_reflector_result(
+        diameter_m=2.0, f_over_d=1.2, offset_clearance_m=0.15, freq_ghz=20.0,
+        q=2.0, pitch_m=0.03, n_feeds=7, zone_radius_deg=8.0, grid=grid,
+        centered_aperture=True,
+    )
+    assert isinstance(res, ReflectorResult)
+    assert res.aperture_center_y_m == 0.0
+
+
 def test_build_reflector_result_n_aperture_pad_factor_defaults_unchanged() -> None:
     # Les défauts n_aperture=128/pad_factor=4 restent ceux de synth_afr :
     # exposer ces kwargs ne doit rien changer sans les fournir explicitement.
@@ -129,6 +140,46 @@ def test_reflector_studio_click_updates_target_and_zoom_panel() -> None:
     assert len(studio._axes) == 6
     assert studio._zoom_cache_key is not None
     assert studio._zoom_cache_result is not None
+    studio.close()
+
+
+def test_reflector_studio_centered_checkbox_checked_by_default() -> None:
+    """La checkbox « Réflecteur centré » existe et est cochée par défaut."""
+    import os
+
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    os.environ.setdefault("MPLBACKEND", "Agg")
+    from PyQt6.QtWidgets import QApplication, QCheckBox
+
+    from grd_generator.gui import ReflectorStudio
+
+    _app = QApplication.instance() or QApplication([])
+    studio = ReflectorStudio(n_u=21, n_v=21)
+    assert isinstance(studio._centered, QCheckBox)
+    assert studio._centered.isChecked() is True
+    studio.close()
+
+
+def test_reflector_studio_unchecking_centered_uses_offset_aperture() -> None:
+    """Décocher la case doit régénérer avec l'ouverture offset réelle (Y0 != 0)."""
+    import os
+
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    os.environ.setdefault("MPLBACKEND", "Agg")
+    from PyQt6.QtWidgets import QApplication
+
+    from grd_generator.gui import ReflectorStudio
+
+    _app = QApplication.instance() or QApplication([])
+    studio = ReflectorStudio(n_u=21, n_v=21)
+    assert studio._afr_result is not None
+    assert studio._afr_result.aperture_center_y_m == 0.0
+
+    studio._centered.setChecked(False)
+    studio.generate()
+
+    assert studio._afr_result is not None
+    assert studio._afr_result.aperture_center_y_m > 0.0
     studio.close()
 
 

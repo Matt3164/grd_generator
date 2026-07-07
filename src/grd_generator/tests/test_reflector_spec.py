@@ -16,6 +16,20 @@ def test_reflector_spec_rejects_nonpositive() -> None:
         ReflectorSpec(diameter_m=0.0, focal_length_m=2.4, freq_hz=20e9)
 
 
+def test_reflector_spec_centered_aperture_defaults_false() -> None:
+    spec = ReflectorSpec(diameter_m=2.0, focal_length_m=2.4, freq_hz=20e9)
+    assert spec.centered_aperture is False
+
+
+def test_reflector_spec_centered_aperture_true_centers_on_axis() -> None:
+    # offset_clearance_m non nul doit être ignoré quand centered_aperture=True.
+    spec = ReflectorSpec(
+        diameter_m=2.0, focal_length_m=2.4, offset_clearance_m=0.15,
+        freq_hz=20e9, centered_aperture=True,
+    )
+    assert spec.aperture_center_y_m == 0.0
+
+
 def test_feed_spec_counts() -> None:
     feeds = FeedSpec(positions_m=[(0.0, 0.0), (0.01, 0.0)], q=2.0)
     assert feeds.n_feeds == 2

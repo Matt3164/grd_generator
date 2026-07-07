@@ -13,6 +13,13 @@ class ReflectorSpec(BaseModel):
     offset_clearance_m: float = Field(0.0, ge=0)
     freq_hz: float = Field(..., gt=0)
     beam_deviation_factor: float = Field(1.0, gt=0)
+    centered_aperture: bool = Field(
+        False,
+        description=(
+            "Ouverture centrée sur l'axe (réflecteur front-fed axisymétrique) : "
+            "patterns radiaux symétriques. Quand True, `offset_clearance_m` est ignoré."
+        ),
+    )
 
     @property
     def wavelength_m(self) -> float:
@@ -24,7 +31,13 @@ class ReflectorSpec(BaseModel):
 
     @property
     def aperture_center_y_m(self) -> float:
-        """Décalage du centre de l'ouverture projetée par rapport à l'axe."""
+        """Décalage du centre de l'ouverture projetée par rapport à l'axe.
+
+        `0.0` si `centered_aperture` (ouverture axisymétrique, front-fed) ;
+        sinon `offset_clearance_m + diameter_m/2` (ouverture offset réelle).
+        """
+        if self.centered_aperture:
+            return 0.0
         return self.offset_clearance_m + self.diameter_m / 2.0
 
 

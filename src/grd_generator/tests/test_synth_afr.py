@@ -146,6 +146,63 @@ def test_axial_defocus_offset_aperture_does_not_squint() -> None:
     assert peak_defocused < peak_focused
 
 
+def _v_asymmetry_db(dbi: np.ndarray, grid: UVGrid, *, u0: float = 0.0) -> float:
+    """Asymétrie haut/bas (dB) de la coupe u=u0 : max |dbi(v) - dbi(-v)| près du pic.
+
+    Restreint aux points à moins de 10 dB de la crête pour ignorer le bruit
+    numérique des lobes très bas (planchers -12 dB imposés par `maximum`).
+    Suppose une grille symétrique en v (v_min = -v_max, n_v impair) pour que
+    v=0 tombe exactement sur un point de grille.
+    """
+    u_axis, v_axis = grid.axes()
+    iu0 = int(np.argmin(np.abs(u_axis - u0)))
+    profile = dbi[:, iu0]
+    mid = len(profile) // 2
+    assert v_axis[mid] == pytest.approx(0.0, abs=1e-9)
+    peak = float(profile.max())
+    near_peak = profile > peak - 10.0
+    diffs = [
+        abs(profile[mid + k] - profile[mid - k])
+        for k in range(1, mid)
+        if near_peak[mid + k] or near_peak[mid - k]
+    ]
+    return max(diffs) if diffs else 0.0
+
+
+def test_centered_aperture_defocus_gives_symmetric_farfield_cut() -> None:
+    # Contexte (diagnostic) : sur ce modèle AFR, l'ouverture offset produit de
+    # la coma sous defocus (asymétrie haut/bas marquée, "oreilles"). Une
+    # ouverture centrée (centered_aperture=True, Y0=0) est axisymétrique : le
+    # champ d'ouverture scalaire ne dépend que de rho=||(X,Y)|| pour un feed
+    # central, et la décomposition Ludwig-3 préserve la parité en v (preuve :
+    # e_co(L,-M)=e_co(L,M) car Fx est pair en Y, Fy impair, phi impair en M).
+    # La coupe u=0 doit donc être symétrique en v à la précision numérique
+    # près, bien au-dessous du seuil de garde-fou de 0.5 dB.
+    spec = ReflectorSpec(
+        diameter_m=0.28, focal_length_m=0.336, freq_hz=20e9, centered_aperture=True
+    )
+    grid = UVGrid(u_min=-14, u_max=14, v_min=-14, v_max=14, n_u=161, n_v=161)
+    feeds = FeedSpec(positions_m=[(0.0, 0.0)], q=2.0, defocus_m=0.2)
+    co, _ = synthesize_reflector_fields(spec, feeds, grid, n_aperture=64, pad_factor=4)
+    dbi = 10.0 * np.log10(np.maximum(np.abs(co[0]) ** 2, 1e-12))
+    assert _v_asymmetry_db(dbi, grid) < 0.5
+
+
+def test_offset_aperture_defocus_gives_asymmetric_farfield_cut() -> None:
+    # Garde-fou : la même config, mais avec l'ouverture offset réelle (défaut
+    # du modèle, `centered_aperture=False`), doit rester nettement asymétrique
+    # (coma) — sinon `test_centered_aperture_...` ci-dessus ne testerait rien
+    # (un bug qui ignorerait `centered_aperture` passerait quand même).
+    spec = ReflectorSpec(
+        diameter_m=0.28, focal_length_m=0.336, offset_clearance_m=0.15, freq_hz=20e9
+    )
+    grid = UVGrid(u_min=-14, u_max=14, v_min=-14, v_max=14, n_u=161, n_v=161)
+    feeds = FeedSpec(positions_m=[(0.0, 0.0)], q=2.0, defocus_m=0.2)
+    co, _ = synthesize_reflector_fields(spec, feeds, grid, n_aperture=64, pad_factor=4)
+    dbi = 10.0 * np.log10(np.maximum(np.abs(co[0]) ** 2, 1e-12))
+    assert _v_asymmetry_db(dbi, grid) > 5.0
+
+
 def _unaliased_dereference_grid() -> UVGrid:
     """Grille (u,v) NON aliasée pour le porteuse k·Y0·sin(v) des tests de phase.
 

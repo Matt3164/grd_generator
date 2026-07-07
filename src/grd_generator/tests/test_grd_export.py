@@ -115,3 +115,32 @@ def test_simulation_params_dict_includes_defocus_m() -> None:
         defocus_m=0.15,
     )
     assert params["defocus_m"] == pytest.approx(0.15)
+
+
+def test_simulation_params_dict_includes_centered_aperture_default_false() -> None:
+    params = simulation_params_dict(
+        diameter_m=2.0,
+        f_over_d=1.2,
+        offset_clearance_m=0.0,
+        freq_ghz=20.0,
+        q=2.0,
+        pitch_m=0.03,
+        n_feeds=80,
+        zone_radius_deg=6.0,
+    )
+    assert params["centered_aperture"] is False
+
+
+def test_simulation_params_dict_includes_centered_aperture_true() -> None:
+    params = simulation_params_dict(
+        diameter_m=2.0,
+        f_over_d=1.2,
+        offset_clearance_m=0.0,
+        freq_ghz=20.0,
+        q=2.0,
+        pitch_m=0.03,
+        n_feeds=80,
+        zone_radius_deg=6.0,
+        centered_aperture=True,
+    )
+    assert params["centered_aperture"] is True
