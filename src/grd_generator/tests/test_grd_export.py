@@ -39,17 +39,21 @@ def test_grd_header_and_row_count() -> None:
     assert len(data_rows) == grid.n_u * grid.n_v
 
 
-def test_grd_grid_limits_in_direction_cosines() -> None:
+def test_grd_grid_limits_match_axis_bounds_directly() -> None:
+    # La grille reflector est déjà en cosinus directeurs (IGRID=1) : les bornes
+    # XS/YS/XE/YE écrites sont les valeurs d'axe telles quelles, sans `sin`
+    # (celui-ci a déjà été appliqué en amont, lors du rééchantillonnage du
+    # far-field sur la grille).
     grid = _grid()
     co, cross = _fields()
     text = pattern_to_grd(co, cross, grid, freq_hz=20e9)
     lines = text.splitlines()
     sep = lines.index("++++")
     xs, ys, xe, ye = (float(x) for x in lines[sep + 4].split())
-    assert math.isclose(xs, math.sin(math.radians(-10)), rel_tol=1e-9)
-    assert math.isclose(ys, math.sin(math.radians(-8)), rel_tol=1e-9)
-    assert math.isclose(xe, math.sin(math.radians(10)), rel_tol=1e-9)
-    assert math.isclose(ye, math.sin(math.radians(8)), rel_tol=1e-9)
+    assert math.isclose(xs, -10.0, rel_tol=1e-9)
+    assert math.isclose(ys, -8.0, rel_tol=1e-9)
+    assert math.isclose(xe, 10.0, rel_tol=1e-9)
+    assert math.isclose(ye, 8.0, rel_tol=1e-9)
 
 
 def test_grd_data_values_roundtrip() -> None:

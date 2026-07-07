@@ -47,7 +47,7 @@ def write_reflector_reference(path: Path, ref: dict[str, Any]) -> None:  # pragm
 
 def main() -> None:  # pragma: no cover
     configure_logging()
-    grid = UVGrid(u_min=-14, u_max=14, v_min=-14, v_max=14, n_u=161, n_v=161)
+    grid = UVGrid(u_min=-0.25, u_max=0.25, v_min=-0.25, v_max=0.25, n_u=161, n_v=161)
     spec = ReflectorSpec(diameter_m=2.0, focal_length_m=2.4, freq_hz=20e9)
     feeds = FeedSpec(positions_m=hex_feed_positions(0.03, 80, 0.3), q=2.0)
     zone = ServiceZone(radius_deg=8.0)

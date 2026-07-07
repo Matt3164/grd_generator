@@ -9,7 +9,13 @@ DirectivityMap = NDArray[np.float64]  # directivité en dBi sur la grille
 
 
 class UVGrid(BaseModel):
-    """Maillage angulaire régulier (u, v) vu du satellite, en degrés."""
+    """Maillage angulaire régulier (u, v) vu du satellite.
+
+    Unité selon le chemin : `PatternStudio` (calibration) reste en degrés ;
+    `ReflectorStudio` (AFR) est en cosinus directeurs (u,v) = (sinθcosφ,
+    sinθsinφ), conforme GRASP IGRID=1. `UVGrid` lui-même est agnostique de
+    l'unité — c'est un maillage régulier générique.
+    """
 
     u_min: float
     u_max: float

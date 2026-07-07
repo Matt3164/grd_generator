@@ -36,7 +36,7 @@ def test_build_result_shapes_and_mode() -> None:
 
 
 def test_build_reflector_result_pure() -> None:
-    grid = UVGrid(u_min=-14, u_max=14, v_min=-14, v_max=14, n_u=41, n_v=41)
+    grid = UVGrid(u_min=-0.25, u_max=0.25, v_min=-0.25, v_max=0.25, n_u=41, n_v=41)
     res = build_reflector_result(
         diameter_m=2.0, f_over_d=1.2, offset_clearance_m=0.0, freq_ghz=20.0,
         q=2.0, pitch_m=0.03, n_feeds=7, zone_radius_deg=8.0, grid=grid,
@@ -48,7 +48,7 @@ def test_build_reflector_result_pure() -> None:
 
 
 def test_build_reflector_result_with_defocus() -> None:
-    grid = UVGrid(u_min=-14, u_max=14, v_min=-14, v_max=14, n_u=41, n_v=41)
+    grid = UVGrid(u_min=-0.25, u_max=0.25, v_min=-0.25, v_max=0.25, n_u=41, n_v=41)
     res = build_reflector_result(
         diameter_m=2.0, f_over_d=1.2, offset_clearance_m=0.0, freq_ghz=20.0,
         q=2.0, pitch_m=0.03, n_feeds=7, zone_radius_deg=8.0, grid=grid,
@@ -60,7 +60,7 @@ def test_build_reflector_result_with_defocus() -> None:
 
 
 def test_build_reflector_result_centered_aperture_true_runs() -> None:
-    grid = UVGrid(u_min=-14, u_max=14, v_min=-14, v_max=14, n_u=41, n_v=41)
+    grid = UVGrid(u_min=-0.25, u_max=0.25, v_min=-0.25, v_max=0.25, n_u=41, n_v=41)
     res = build_reflector_result(
         diameter_m=2.0, f_over_d=1.2, offset_clearance_m=0.15, freq_ghz=20.0,
         q=2.0, pitch_m=0.03, n_feeds=7, zone_radius_deg=8.0, grid=grid,
@@ -73,7 +73,7 @@ def test_build_reflector_result_centered_aperture_true_runs() -> None:
 def test_build_reflector_result_n_aperture_pad_factor_defaults_unchanged() -> None:
     # Les défauts n_aperture=128/pad_factor=4 restent ceux de synth_afr :
     # exposer ces kwargs ne doit rien changer sans les fournir explicitement.
-    grid = UVGrid(u_min=-14, u_max=14, v_min=-14, v_max=14, n_u=41, n_v=41)
+    grid = UVGrid(u_min=-0.25, u_max=0.25, v_min=-0.25, v_max=0.25, n_u=41, n_v=41)
     res_default = build_reflector_result(
         diameter_m=2.0, f_over_d=1.2, offset_clearance_m=0.0, freq_ghz=20.0,
         q=2.0, pitch_m=0.03, n_feeds=7, zone_radius_deg=8.0, grid=grid,
@@ -133,10 +133,12 @@ def test_reflector_studio_click_updates_target_and_zoom_panel() -> None:
     studio.generate()
     assert len(studio._axes) == 6
 
-    event = SimpleNamespace(inaxes=studio._axes[2], xdata=0.0, ydata=2.0)
+    # (u,v) en cosinus directeurs : la grille par défaut du studio est ±0.25,
+    # donc une cible à l'intérieur du champ de vue est de cet ordre.
+    event = SimpleNamespace(inaxes=studio._axes[2], xdata=0.0, ydata=0.05)
     studio._on_click(event)
 
-    assert studio._target_uv == (0.0, 2.0)
+    assert studio._target_uv == (0.0, 0.05)
     assert len(studio._axes) == 6
     assert studio._zoom_cache_key is not None
     assert studio._zoom_cache_result is not None

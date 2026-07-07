@@ -51,7 +51,8 @@ def test_ludwig3_pure_copol_has_negligible_cross_near_axis() -> None:
 def test_resample_picks_nearest_grid_values() -> None:
     lin = np.linspace(-0.2, 0.2, 41)
     field = np.tile(lin, (41, 1)).astype(complex)  # value == l
-    grid = UVGrid(u_min=-5, u_max=5, v_min=-5, v_max=5, n_u=11, n_v=11)
+    grid = UVGrid(u_min=-0.15, u_max=0.15, v_min=-0.15, v_max=0.15, n_u=11, n_v=11)
     out = farfield.resample_to_uvgrid(field, lin, grid)
     u, _ = grid.axes()
-    np.testing.assert_allclose(out[5, :].real, np.sin(np.radians(u)), atol=1e-3)
+    # Grille reflector déjà en cosinus directeurs : pas de `sin`, échantillonnage direct.
+    np.testing.assert_allclose(out[5, :].real, u, atol=1e-3)

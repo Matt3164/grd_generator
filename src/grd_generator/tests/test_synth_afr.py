@@ -10,9 +10,27 @@ from grd_generator.reflector import (
 )
 from grd_generator.schemas import UVGrid
 
+# Grille reflector en cosinus directeurs : ±0.25 ≈ ±14° (sin(14°)=0.242).
+_UV_HALF_WIDTH = 0.25
+# Seuil "≈1°" (proximité du pic au boresight, écart de scan), converti en
+# cosinus directeur : sin(radians(1.0)).
+_ONE_DEG_UV = float(np.sin(np.radians(1.0)))
+
 
 def _grid() -> UVGrid:
-    return UVGrid(u_min=-14, u_max=14, v_min=-14, v_max=14, n_u=81, n_v=81)
+    return UVGrid(
+        u_min=-_UV_HALF_WIDTH, u_max=_UV_HALF_WIDTH,
+        v_min=-_UV_HALF_WIDTH, v_max=_UV_HALF_WIDTH,
+        n_u=81, n_v=81,
+    )
+
+
+def _grid_161() -> UVGrid:
+    return UVGrid(
+        u_min=-_UV_HALF_WIDTH, u_max=_UV_HALF_WIDTH,
+        v_min=-_UV_HALF_WIDTH, v_max=_UV_HALF_WIDTH,
+        n_u=161, n_v=161,
+    )
 
 
 def _minus3db_width_deg(dbi: np.ndarray, grid: UVGrid) -> float:
@@ -57,7 +75,7 @@ def test_centered_feed_beam_points_at_boresight() -> None:
     dbi = 10.0 * np.log10(np.abs(co[0]) ** 2)
     iv, iu = np.unravel_index(np.argmax(dbi), dbi.shape)
     gu, gv = _grid().meshgrid()
-    assert abs(gu[iv, iu]) < 1.0 and abs(gv[iv, iu]) < 1.0  # peak near (0,0)
+    assert abs(gu[iv, iu]) < _ONE_DEG_UV and abs(gv[iv, iu]) < _ONE_DEG_UV  # peak near (0,0)
 
 
 def test_displaced_feed_beam_scans() -> None:
@@ -68,7 +86,7 @@ def test_displaced_feed_beam_scans() -> None:
     dbi = 10.0 * np.log10(np.abs(co[0]) ** 2)
     iv, iu = np.unravel_index(np.argmax(dbi), dbi.shape)
     gu, _ = _grid().meshgrid()
-    assert abs(gu[iv, iu]) > 1.0  # beam moved away from boresight in u
+    assert abs(gu[iv, iu]) > _ONE_DEG_UV  # beam moved away from boresight in u
 
 
 def test_hex_feed_positions_count_and_centering() -> None:
@@ -122,7 +140,8 @@ def test_axial_defocus_offset_aperture_does_not_squint() -> None:
     spec = ReflectorSpec(
         diameter_m=0.28, focal_length_m=0.336, offset_clearance_m=0.15, freq_hz=20e9
     )
-    grid = UVGrid(u_min=-30, u_max=30, v_min=-30, v_max=30, n_u=121, n_v=121)
+    # sin(30°) = 0.5 exactement : bornes cosinus directeurs équivalentes à ±30°.
+    grid = UVGrid(u_min=-0.5, u_max=0.5, v_min=-0.5, v_max=0.5, n_u=121, n_v=121)
     du = (grid.u_max - grid.u_min) / (grid.n_u - 1)
     dv = (grid.v_max - grid.v_min) / (grid.n_v - 1)
     gu, gv = grid.meshgrid()
@@ -181,7 +200,7 @@ def test_centered_aperture_defocus_gives_symmetric_farfield_cut() -> None:
     spec = ReflectorSpec(
         diameter_m=0.28, focal_length_m=0.336, freq_hz=20e9, centered_aperture=True
     )
-    grid = UVGrid(u_min=-14, u_max=14, v_min=-14, v_max=14, n_u=161, n_v=161)
+    grid = _grid_161()
     feeds = FeedSpec(positions_m=[(0.0, 0.0)], q=2.0, defocus_m=0.2)
     co, _ = synthesize_reflector_fields(spec, feeds, grid, n_aperture=64, pad_factor=4)
     dbi = 10.0 * np.log10(np.maximum(np.abs(co[0]) ** 2, 1e-12))
@@ -196,27 +215,41 @@ def test_offset_aperture_defocus_gives_asymmetric_farfield_cut() -> None:
     spec = ReflectorSpec(
         diameter_m=0.28, focal_length_m=0.336, offset_clearance_m=0.15, freq_hz=20e9
     )
-    grid = UVGrid(u_min=-14, u_max=14, v_min=-14, v_max=14, n_u=161, n_v=161)
+    grid = _grid_161()
     feeds = FeedSpec(positions_m=[(0.0, 0.0)], q=2.0, defocus_m=0.2)
     co, _ = synthesize_reflector_fields(spec, feeds, grid, n_aperture=64, pad_factor=4)
     dbi = 10.0 * np.log10(np.maximum(np.abs(co[0]) ** 2, 1e-12))
     assert _v_asymmetry_db(dbi, grid) > 5.0
 
 
-def _unaliased_dereference_grid() -> UVGrid:
-    """Grille (u,v) NON aliasée pour le porteuse k·Y0·sin(v) des tests de phase.
+# Demi-largeur ±2° convertie en cosinus directeur (grille reflector), utilisée
+# par `_unaliased_dereference_grid` pour reproduire le même gradient de phase
+# par pixel qu'avant la conversion (voir sa docstring).
+_UNALIASED_HALF_WIDTH_UV = float(np.sin(np.radians(2.0)))
 
-    Sur la grille d'affichage standard (`_grid()`, ±14°/81px), le gradient de
-    phase par pixel de la porteuse dépasse π (repliement) : un bug de signe y
-    est masqué par l'aliasing lui-même (voir tâche). Ici, gradient de phase de
-    la porteuse par pixel ≈ 0.73 rad < π/4 : la grille résout correctement la
-    porteuse, donc un signe inversé produit un résidu net (non masqué).
+
+def _unaliased_dereference_grid() -> UVGrid:
+    """Grille (u,v) NON aliasée pour la porteuse k·Y0·v des tests de phase.
+
+    `v` est ici directement le cosinus directeur (grille reflector, pas de
+    `sin` supplémentaire dans `dereference_phase`). Sur la grille d'affichage
+    standard (`_grid()`, ±0.25/81px), le gradient de phase par pixel de la
+    porteuse dépasse π (repliement) : un bug de signe y est masqué par
+    l'aliasing lui-même (voir tâche). Ici (±sin(2°)/51px, la même couverture
+    angulaire physique qu'avant la conversion aux cosinus directeurs), le
+    gradient de phase de la porteuse par pixel ≈ 0.73 rad < π/4 : la grille
+    résout correctement la porteuse, donc un signe inversé produit un résidu
+    net (non masqué).
     """
-    return UVGrid(u_min=-2.0, u_max=2.0, v_min=-2.0, v_max=2.0, n_u=21, n_v=51)
+    return UVGrid(
+        u_min=-_UNALIASED_HALF_WIDTH_UV, u_max=_UNALIASED_HALF_WIDTH_UV,
+        v_min=-_UNALIASED_HALF_WIDTH_UV, v_max=_UNALIASED_HALF_WIDTH_UV,
+        n_u=21, n_v=51,
+    )
 
 
 def test_dereference_phase_removes_pure_carrier() -> None:
-    # Un champ qui N'EST QUE la porteuse physique exp(-i·k·Y0·sin v) (signe de
+    # Un champ qui N'EST QUE la porteuse physique exp(-i·k·Y0·v) (signe de
     # la convention FFT de `farfield.far_field_fft`, voir docstring de
     # `dereference_phase`) doit être dé-référencé à une phase ~0 partout :
     # c'est exactement le terme retiré.
@@ -225,7 +258,7 @@ def test_dereference_phase_removes_pure_carrier() -> None:
     y0 = 1.25  # aperture_center_y_m typique (D=2.2, clearance=0.15)
     _, gv = grid.meshgrid()
     k = 2.0 * np.pi / wavelength_m
-    m = np.sin(np.deg2rad(gv))
+    m = gv
     field = np.exp(-1j * k * y0 * m)
 
     dephased = dereference_phase(field, grid, wavelength_m, y0)
@@ -235,7 +268,7 @@ def test_dereference_phase_removes_pure_carrier() -> None:
 
 def test_dereference_phase_constant_field_yields_carrier() -> None:
     # Un champ constant (phase nulle partout) n'a pas de porteuse à retirer : le
-    # résultat est donc exactement la porteuse conjuguée k·Y0·sin v appliquée
+    # résultat est donc exactement la porteuse conjuguée k·Y0·v appliquée
     # par la fonction (voir docstring).
     grid = _unaliased_dereference_grid()
     wavelength_m = 0.015
@@ -246,7 +279,7 @@ def test_dereference_phase_constant_field_yields_carrier() -> None:
 
     _, gv = grid.meshgrid()
     k = 2.0 * np.pi / wavelength_m
-    expected = np.angle(np.exp(1j * k * y0 * np.sin(np.deg2rad(gv))))
+    expected = np.angle(np.exp(1j * k * y0 * gv))
     np.testing.assert_allclose(dephased, expected, atol=1e-9)
 
 
@@ -260,8 +293,11 @@ def test_dereference_phase_reduces_v_gradient_for_carrier_plus_slow_structure() 
     y0 = 1.25
     _, gv = grid.meshgrid()
     k = 2.0 * np.pi / wavelength_m
-    m = np.sin(np.deg2rad(gv))
-    slow_phase = 0.05 * gv  # gradient lent et petit devant k·y0·d(sin v)/dv
+    m = gv
+    # Coefficient choisi pour que |slow_phase| reste du même ordre de grandeur
+    # (~0.1 rad) qu'avant la conversion aux cosinus directeurs, où `gv`
+    # parcourait ±2° au lieu de ±sin(2°) ici : facteur 2.0/sin(2°) ≈ 57.3.
+    slow_phase = 0.05 * (2.0 / _UNALIASED_HALF_WIDTH_UV) * gv
     field = np.exp(1j * (-k * y0 * m + slow_phase))
 
     before = np.unwrap(np.angle(field), axis=0)
@@ -276,7 +312,7 @@ def test_dereference_phase_sign_matters_on_unaliased_grid() -> None:
     # Garde-fou anti-régression du bug de signe : sur une grille NON aliasée
     # (voir `_unaliased_dereference_grid`), l'implémentation correcte laisse un
     # résidu de gradient quasi nul, tandis que le signe inversé (bug historique
-    # : `exp(-i·k·Y0·sin v)` au lieu de `exp(+i·k·Y0·sin v)`) laisse un résidu
+    # : `exp(-i·k·Y0·v)` au lieu de `exp(+i·k·Y0·v)`) laisse un résidu
     # de phase largement supérieur à 1 rad — preuve que ce test distinguerait
     # bien une régression de signe (contrairement à une grille aliasée où le
     # repliement masquerait l'erreur, cf. tâche : 3.09 -> 0.02 rad/pixel).
@@ -285,7 +321,7 @@ def test_dereference_phase_sign_matters_on_unaliased_grid() -> None:
     y0 = 1.25
     _, gv = grid.meshgrid()
     k = 2.0 * np.pi / wavelength_m
-    m = np.sin(np.deg2rad(gv))
+    m = gv
     field = np.exp(-1j * k * y0 * m)  # porteuse physique réelle
 
     correct = dereference_phase(field, grid, wavelength_m, y0)

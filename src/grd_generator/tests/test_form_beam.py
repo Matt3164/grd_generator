@@ -11,7 +11,8 @@ from grd_generator.schemas import UVGrid
 
 
 def _grid() -> UVGrid:
-    return UVGrid(u_min=-14, u_max=14, v_min=-14, v_max=14, n_u=81, n_v=81)
+    # Grille reflector en cosinus directeurs : ±0.25 ≈ ±14° (sin(14°)=0.242).
+    return UVGrid(u_min=-0.25, u_max=0.25, v_min=-0.25, v_max=0.25, n_u=81, n_v=81)
 
 
 def _fields() -> list[np.ndarray]:

@@ -21,7 +21,7 @@ def hex_feed_positions(
 def form_beam(
     co_fields: list[ComplexField], grid: UVGrid, target_uv: tuple[float, float]
 ) -> ComplexField:
-    """Beam formé par filtre adapté (conjugate beamforming) vers `target_uv` (deg).
+    """Beam formé par filtre adapté (conjugate beamforming) vers `target_uv`.
 
     Poids `wᵢ = conj(Eᵢ(cible))` normalisés en norme L2 unité ; champ combiné
     `B(u,v) = Σᵢ wᵢ·Eᵢ(u,v)`. Par Cauchy-Schwarz, `|B(cible)|² = Σᵢ|Eᵢ(cible)|²`,
@@ -48,21 +48,23 @@ def dereference_phase(
     """Phase de `field` dé-référencée de la porteuse due au centre d'ouverture décalé.
 
     Un centre d'ouverture excentré en Y₀ = `aperture_center_y_m` (offset) impose au
-    champ lointain une porteuse de phase quasi-linéaire en v :
-    `exp(-i·k·Y₀·sin v)` (k = 2π/λ) — signe hérité de la convention de
-    `numpy.fft.fft2` utilisée par `farfield.far_field_fft` (TF directe en
-    exp(-i·2π·f·x) : un décalage +Y₀ de l'ouverture multiplie son spectre par
-    exp(-i·2π·f·Y₀) = exp(-i·k·Y₀·sin v)). Sur une grille d'affichage grossière,
-    cette porteuse se replie visuellement en rayures horizontales (moiré) qui
-    masquent la structure de phase utile. Cette fonction ne change PAS la
-    physique : elle retire cette porteuse *pour l'affichage seul*, en renvoyant
-    `angle(field · exp(i·k·Y₀·sin v))` (conjugué de la porteuse, pour
-    l'annuler). Les champs utilisés pour le beamforming (`form_beam`) et les
-    exports GRD doivent rester les champs bruts, pas ce résultat.
+    champ lointain une porteuse de phase quasi-linéaire en v (cosinus directeur,
+    v = m = sinθsinφ) : `exp(-i·k·Y₀·m)` (k = 2π/λ) — signe hérité de la
+    convention de `numpy.fft.fft2` utilisée par `farfield.far_field_fft` (TF
+    directe en exp(-i·2π·f·x) : un décalage +Y₀ de l'ouverture multiplie son
+    spectre par exp(-i·2π·f·Y₀) = exp(-i·k·Y₀·m)). `grid` étant déjà en
+    cosinus directeurs (reflector), `m = gv` directement — pas de conversion
+    `sin`. Sur une grille d'affichage grossière, cette porteuse se replie
+    visuellement en rayures horizontales (moiré) qui masquent la structure de
+    phase utile. Cette fonction ne change PAS la physique : elle retire cette
+    porteuse *pour l'affichage seul*, en renvoyant `angle(field ·
+    exp(i·k·Y₀·m))` (conjugué de la porteuse, pour l'annuler). Les champs
+    utilisés pour le beamforming (`form_beam`) et les exports GRD doivent
+    rester les champs bruts, pas ce résultat.
     """
     _, gv = grid.meshgrid()
     k = 2.0 * np.pi / wavelength_m
-    m = np.sin(np.deg2rad(gv))
+    m = gv
     carrier = np.exp(1j * k * aperture_center_y_m * m)
     dereferenced: FloatArray = np.angle(field * carrier)
     return dereferenced

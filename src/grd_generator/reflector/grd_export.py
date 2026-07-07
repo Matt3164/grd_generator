@@ -5,12 +5,14 @@ Format `.grd` (un jeu de champ par fichier) : bloc d'en-tête texte libre, sépa
 (NX, NY, KLIMIT), et NX·NY lignes `Re(co) Im(co) Re(cross) Im(cross)`.
 
 Conventions retenues : ICOMP=3 (co/cross Ludwig-3), NCOMP=2, IGRID=1 (grille en
-cosinus directeurs u=sinθcosφ, v=sinθsinφ) — les bornes sont donc `sin(rad(u,v))`.
+cosinus directeurs u=sinθcosφ, v=sinθsinφ) — la grille `UVGrid` du reflector est
+déjà exprimée en cosinus directeurs, donc les bornes XS/YS/XE/YE sont les valeurs
+d'axe telles quelles (pas de `sin` ici : elle a déjà été appliquée en amont, lors
+du rééchantillonnage du far-field sur la grille).
 Les champs sont ceux stockés par la synthèse : amplitude normalisée en directivité.
 """
 
 import io
-import math
 import zipfile
 from typing import Any
 
@@ -27,10 +29,10 @@ def pattern_to_grd(
 ) -> str:
     """Sérialise un pattern (co + cross) au format TICRA GRASP `.grd` ASCII."""
     u_axis, v_axis = grid.axes()
-    xs = math.sin(math.radians(float(u_axis[0])))
-    ys = math.sin(math.radians(float(v_axis[0])))
-    xe = math.sin(math.radians(float(u_axis[-1])))
-    ye = math.sin(math.radians(float(v_axis[-1])))
+    xs = float(u_axis[0])
+    ys = float(v_axis[0])
+    xe = float(u_axis[-1])
+    ye = float(v_axis[-1])
     nx, ny = grid.n_u, grid.n_v
 
     lines = [

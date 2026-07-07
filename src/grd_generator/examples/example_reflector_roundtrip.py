@@ -43,6 +43,11 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_REFERENCE_REPORT = REPO_ROOT / "data" / "reference_reports" / "0000" / "report.json"
 DEFAULT_OUT_DIR = REPO_ROOT / "data" / "export" / "roundtrip" / "default"
 
+# Grille reflector en cosinus directeurs (u,v) = (sinθcosφ, sinθsinφ), conforme
+# GRASP IGRID=1. ±0.25 ≈ ±14° (sin(14°)=0.242) : même champ de vue que l'ancienne
+# grille en degrés.
+_UV_HALF_WIDTH = 0.25
+
 # Stats comparées entre le rapport simulé et le rapport de référence. Voir la
 # note de confidentialité en tête de module : `peak_dbi_mean` est exclu.
 COMPARED_STATS = (
@@ -107,7 +112,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def generate_and_export_grd(args: argparse.Namespace, grd_dir: Path) -> int:
     """Génère les champs AFR et écrit un `.grd` (co+cross) par feed dans `grd_dir`."""
     grid = UVGrid(
-        u_min=-14.0, u_max=14.0, v_min=-14.0, v_max=14.0, n_u=args.n_grid, n_v=args.n_grid
+        u_min=-_UV_HALF_WIDTH, u_max=_UV_HALF_WIDTH,
+        v_min=-_UV_HALF_WIDTH, v_max=_UV_HALF_WIDTH,
+        n_u=args.n_grid, n_v=args.n_grid,
     )
     result = build_reflector_result(
         diameter_m=args.diameter_m,

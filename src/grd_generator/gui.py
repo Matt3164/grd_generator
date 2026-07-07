@@ -7,6 +7,7 @@ de l'interface, calibre via la zone et synthétise les champs. Le widget Qt
 
 import argparse
 import json
+import math
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -74,11 +75,18 @@ from grd_generator.synth import combined_max_directivity_dbi, elliptical_field
 
 REPORTS_DIR = Path(__file__).resolve().parents[2] / "data" / "reference_reports"
 
+# Grille reflector (ReflectorStudio + script round-trip) : cosinus directeurs
+# (u,v) = (sinθcosφ, sinθsinφ), conforme GRASP IGRID=1. ±0.25 ≈ ±14° puisque
+# sin(14°)=0.242 : même champ de vue que l'ancienne grille en degrés.
+_REFLECTOR_UV_HALF_WIDTH = 0.25
+
 # Panneau "Beam formé — zoom" (ReflectorStudio) : fenêtre ±_ZOOM_HALF_WIDTH_DEG°
-# centrée sur la cible cliquée, ré-échantillonnée à _ZOOM_N×_ZOOM_N (la crête
-# du beam pleine ouverture, ~λ/D_physique, est sous-résolue sur la grille
-# large ±14°/81px — voir docstring de `ReflectorStudio._draw_beam`).
+# centrée sur la cible cliquée (en cosinus directeurs : ±sin(_ZOOM_HALF_WIDTH_DEG)),
+# ré-échantillonnée à _ZOOM_N×_ZOOM_N (la crête du beam pleine ouverture,
+# ~λ/D_physique, est sous-résolue sur la grille large ±0.25/81px — voir
+# docstring de `ReflectorStudio._draw_beam`).
 _ZOOM_HALF_WIDTH_DEG = 2.0
+_ZOOM_HALF_WIDTH_UV = math.sin(math.radians(_ZOOM_HALF_WIDTH_DEG))
 _ZOOM_N = 81
 
 
@@ -411,8 +419,8 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         self._cb_env_max: Any = None
         self._cb_beam_dir: Any = None
         self._cb_beam_zoom: Any = None
-        self._target_uv: tuple[float, float] = (0.0, 0.0)  # cible du beam formé (deg)
-        # Cache du résultat AFR zoomé (fenêtre ±2° sur la cible) : ré-synthétiser
+        self._target_uv: tuple[float, float] = (0.0, 0.0)  # cible du beam (cosinus directeurs)
+        # Cache du résultat AFR zoomé (fenêtre ±sin(2°) sur la cible) : ré-synthétiser
         # coûte ~4s (n_aperture=128 par défaut), donc uniquement si (cible,
         # paramètres réflecteur/feeds) ont changé depuis le dernier calcul.
         self._zoom_cache_key: tuple[Any, ...] | None = None
@@ -518,8 +526,8 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         principale et peut prendre plusieurs secondes (n_aperture=128 défaut).
         """
         grid = UVGrid(
-            u_min=-14.0, u_max=14.0,
-            v_min=-14.0, v_max=14.0,
+            u_min=-_REFLECTOR_UV_HALF_WIDTH, u_max=_REFLECTOR_UV_HALF_WIDTH,
+            v_min=-_REFLECTOR_UV_HALF_WIDTH, v_max=_REFLECTOR_UV_HALF_WIDTH,
             n_u=self._n_u, n_v=self._n_v,
         )
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
@@ -566,11 +574,15 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         # Enveloppe MRC (combinaison cohérente, beamforming idéal) sur les axes (u,v)
         env = combined_max_directivity_dbi(list(r.co_fields))
         self._cb_env = _draw_uv_map(self._axes[2], r.grid, env, "Enveloppe MRC (beamforming idéal)")
-        draw_service_zone_uv(self._axes[2], r.zone)
+        self._axes[2].set_xlabel("u")
+        self._axes[2].set_ylabel("v")
+        draw_service_zone_uv(self._axes[2], r.zone, to_direction_cosine=True)
         # Enveloppe max par élément (festonnage réel, pas de recombinaison) sur les axes (u,v)
         env_max = envelope_max_dbi(np.stack(r.co_fields))
         self._cb_env_max = _draw_uv_map(self._axes[3], r.grid, env_max, "Enveloppe max par élément")
-        draw_service_zone_uv(self._axes[3], r.zone)
+        self._axes[3].set_xlabel("u")
+        self._axes[3].set_ylabel("v")
+        draw_service_zone_uv(self._axes[3], r.zone, to_direction_cosine=True)
         # Beam formé vers la cible (filtre adapté) : directivité + phase
         self._draw_beam(clear=False)
         self._figure.tight_layout()
@@ -592,7 +604,7 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         )
 
     def _zoomed_beam_result(self) -> ReflectorResult:
-        """Ré-synthétise les champs sur une fenêtre ±2° centrée sur la cible.
+        """Ré-synthétise les champs sur une fenêtre ±sin(2°) centrée sur la cible.
 
         Mémorise le dernier résultat par (cible, paramètres) : ne recalcule que si
         l'un des deux a changé depuis le dernier appel (coût ~4s à n_aperture=128).
@@ -602,8 +614,8 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
             return self._zoom_cache_result
         tu, tv = self._target_uv
         zoom_grid = UVGrid(
-            u_min=tu - _ZOOM_HALF_WIDTH_DEG, u_max=tu + _ZOOM_HALF_WIDTH_DEG,
-            v_min=tv - _ZOOM_HALF_WIDTH_DEG, v_max=tv + _ZOOM_HALF_WIDTH_DEG,
+            u_min=tu - _ZOOM_HALF_WIDTH_UV, u_max=tu + _ZOOM_HALF_WIDTH_UV,
+            v_min=tv - _ZOOM_HALF_WIDTH_UV, v_max=tv + _ZOOM_HALF_WIDTH_UV,
             n_u=_ZOOM_N, n_v=_ZOOM_N,
         )
         result = build_reflector_result(
@@ -627,9 +639,10 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         """Beam formé par filtre adapté vers `self._target_uv` (axe 4) + zoom (axe 5).
 
         Le beam pleine ouverture a une crête ~λ/D_physique de large : sur la
-        grille large ±14°/81px elle ne fait qu'un pixel et n'est pas visible
-        (seul le plancher de speckle l'est). Le panneau 5 ré-échantillonne donc
-        les champs sur une fenêtre ±2° centrée sur la cible pour la résoudre.
+        grille large ±0.25/81px (cosinus directeurs) elle ne fait qu'un pixel
+        et n'est pas visible (seul le plancher de speckle l'est). Le panneau 5
+        ré-échantillonne donc les champs sur une fenêtre ±sin(2°)≈±0.035
+        (cosinus directeurs) centrée sur la cible pour la résoudre.
         """
         assert self._afr_result is not None
         r = self._afr_result
@@ -644,9 +657,11 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
             self._axes[5].clear()
         tu, tv = self._target_uv
         peak_dbi = float(dbi.max())
-        title = f"Beam formé ({tu:.1f}, {tv:.1f})° — crête {peak_dbi:.1f} dBi"
+        title = f"Beam formé ({tu:.2f}, {tv:.2f}) — crête {peak_dbi:.1f} dBi"
         self._cb_beam_dir = _draw_uv_map(self._axes[4], r.grid, dbi, title)
-        draw_service_zone_uv(self._axes[4], r.zone)
+        self._axes[4].set_xlabel("u")
+        self._axes[4].set_ylabel("v")
+        draw_service_zone_uv(self._axes[4], r.zone, to_direction_cosine=True)
         self._axes[4].plot(tu, tv, "rx", markersize=10, markeredgewidth=2)
 
         zoom = self._zoomed_beam_result()
@@ -657,7 +672,9 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
             f" (crête {float(zoom_dbi.max()):.1f} dBi)"
         )
         self._cb_beam_zoom = _draw_uv_map(self._axes[5], zoom.grid, zoom_dbi, zoom_title)
-        draw_service_zone_uv(self._axes[5], zoom.zone)
+        self._axes[5].set_xlabel("u")
+        self._axes[5].set_ylabel("v")
+        draw_service_zone_uv(self._axes[5], zoom.zone, to_direction_cosine=True)
         self._axes[5].plot(tu, tv, "rx", markersize=10, markeredgewidth=2)
         # Le cercle de zone peut être bien plus large que la fenêtre de zoom :
         # borner explicitement la vue pour ne pas laisser matplotlib ré-élargir
@@ -695,7 +712,9 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
             self._axes[0].clear()
             self._axes[1].clear()
         self._cb_dir = _draw_uv_map(self._axes[0], r.grid, dbi, f"Feed #{idx} — co-pol dBi")
-        draw_service_zone_uv(self._axes[0], r.zone)
+        self._axes[0].set_xlabel("u")
+        self._axes[0].set_ylabel("v")
+        draw_service_zone_uv(self._axes[0], r.zone, to_direction_cosine=True)
         # Dé-référencement d'affichage uniquement (voir docstring `dereference_phase`) :
         # retire la porteuse linéaire due au centre d'ouverture décalé, qui sinon se
         # replie en rayures sur cette grille grossière. `field` (utilisé pour le
@@ -705,7 +724,9 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         self._cb_phase = _draw_phase_map(
             self._axes[1], r.grid, dephased_field, f"Feed #{idx} — phase (dé-référencée)"
         )
-        draw_service_zone_uv(self._axes[1], r.zone)
+        self._axes[1].set_xlabel("u")
+        self._axes[1].set_ylabel("v")
+        draw_service_zone_uv(self._axes[1], r.zone, to_direction_cosine=True)
 
     def _on_feed_changed(self, idx: int) -> None:
         if self._afr_result is None:
@@ -821,8 +842,8 @@ faisceau <i>formé</i> vers une cible.</p>
     en haut à gauche.</td></tr>
 <tr><td><b>Cible du beam (clic)</b></td>
     <td>Cliquer sur n'importe quelle carte large (u,v) fixe la coordonnée cible
-    (u,v)° du beam formé par filtre adapté (rangée du bas) — directivité (axe 4)
-    et zoom (axe 5), qui suivent tous les deux le clic.</td></tr>
+    (u,v) — cosinus directeurs — du beam formé par filtre adapté (rangée du bas)
+    — directivité (axe 4) et zoom (axe 5), qui suivent tous les deux le clic.</td></tr>
 </table>
 
 <h3>Détail de la simulation</h3>
@@ -833,7 +854,8 @@ Un feed décalé impose un gradient de phase linéaire (beam deviation factor) q
 dépointe le faisceau secondaire.</li>
 <li><b>Far-field</b> : transformée de Fourier 2D du champ d'ouverture, échantillonnée
 en cosinus directeurs (l,m) = (sinθcosφ, sinθsinφ), puis normalisée en directivité
-(référence isotrope) et rééchantillonnée sur la grille (u,v) en degrés.</li>
+(référence isotrope) et rééchantillonnée sur la grille (u,v), elle-même en
+cosinus directeurs.</li>
 <li><b>Co / cross-pol</b> : décomposition de Ludwig-3 ; la cross-pol vient de la
 géométrie offset.</li>
 <li><b>Beam formé</b> : filtre adapté (conjugate beamforming), poids
@@ -841,36 +863,42 @@ wᵢ = conj(Eᵢ(cible)) normalisés en norme L2 ⇒ la crête touche l'envelopp
 par élément au point visé.</li>
 <li><b>Beam formé — zoom</b> : la crête du beam formé pleine ouverture est large de
 ~λ/D<sub>physique</sub> (ex. ~0,43° à 20 GHz/2 m) — souvent moins large qu'un
-pixel de la grille d'affichage ±14°/81px, donc invisible dans le panneau
-directivité (axe 4), qui ne montre alors que le plancher de speckle. Le panneau
-zoom (axe 5) ré-échantillonne les champs sur une fenêtre ±2° centrée sur la
-cible pour résoudre cette crête ; mémorisé par (cible, paramètres), il ne
-recalcule (coût ~4s) que si l'un des deux change.</li>
+pixel de la grille d'affichage ±0,25/81px (cosinus directeurs), donc invisible
+dans le panneau directivité (axe 4), qui ne montre alors que le plancher de
+speckle. Le panneau zoom (axe 5) ré-échantillonne les champs sur une fenêtre
+±sin(2°)≈±0,035 (cosinus directeurs) centrée sur la cible pour résoudre cette
+crête ; mémorisé par (cible, paramètres), il ne recalcule (coût ~4s) que si
+l'un des deux change.</li>
 <li><b>Enveloppes</b> : « Enveloppe MRC (beamforming idéal) » = RSS
 10·log₁₀ Σ|Eᵢ|² (directivité max <i>atteignable</i> par recombinaison
 cohérente, lisse) ; « Enveloppe max par élément » = max des faisceaux
 individuels sans recombinaison (montre le festonnage réel). Comparer une cible
 de gain à la seconde, pas à la première.</li>
 <li><b>Phase dé-référencée</b> : le panneau phase du feed (axe 1) retire, pour
-l'affichage seulement, la porteuse linéaire exp(-i·k·Y₀·sin v) due au centre
-d'ouverture décalé Y₀ (offset clearance + D/2) — sans elle, cette porteuse se
-replie en rayures (moiré) sur la grille d'affichage grossière. Les champs
-utilisés pour le beamforming et les exports GRD restent inchangés (vérité
-physique).</li>
+l'affichage seulement, la porteuse linéaire exp(-i·k·Y₀·v) due au centre
+d'ouverture décalé Y₀ (offset clearance + D/2), v étant ici le cosinus
+directeur — sans elle, cette porteuse se replie en rayures (moiré) sur la
+grille d'affichage grossière. Les champs utilisés pour le beamforming et les
+exports GRD restent inchangés (vérité physique).</li>
 </ul>
 
 <h3>Convention (u,v)</h3>
-<p>La grille d'affichage (les six cartes du studio) est en <b>degrés</b> :
-(u,v) sont des angles, pas des cosinus directeurs. Le champ lointain, lui, est
-calculé et stocké en cosinus directeurs (l,m) = (sinθcosφ, sinθsinφ) (voir
-« Far-field » ci-dessus) — la grille (u,v) en degrés n'est qu'un
-rééchantillonnage pour l'affichage. L'export <code>.grd</code> suit la
-convention GRASP <b>IGRID=1</b> : ses bornes ne sont pas les degrés (u,v)
-eux-mêmes mais <code>sin(rad(u,v))</code>, c'est-à-dire les cosinus directeurs
-correspondants. La grille interne étant uniforme en degrés et exportée comme
-uniforme en cosinus directeurs, cette approximation est exacte aux petits
-angles et introduit un écart d'échantillonnage d'environ 1&nbsp;% à
-±14°.</p>
+<p>La grille d'affichage (les six cartes du studio) est en <b>cosinus
+directeurs</b> : (u,v) = (sinθcosφ, sinθsinφ), et non des angles en degrés. Le
+champ lointain est calculé nativement dans cette même convention (voir
+« Far-field » ci-dessus) : la grille (u,v) affichée est donc directement la
+grille de calcul, sans conversion. L'export <code>.grd</code> suit la
+convention GRASP <b>IGRID=1</b> (grille uniforme en cosinus directeurs) : ses
+bornes XS/YS/XE/YE sont les valeurs d'axe (u,v) telles quelles. La grille
+interne étant elle-même uniforme en cosinus directeurs, cette correspondance
+est exacte — contrairement à l'ancienne convention (u,v) en degrés, dont
+l'export GRASP n'était qu'une approximation (grille uniforme en degrés,
+sin(rad(u,v)) à l'export) exacte aux petits angles seulement, avec un écart
+d'échantillonnage d'environ 1&nbsp;% à ±14°. Le champ de vue par défaut
+(±0,25) correspond à peu près à l'ancien ±14° (sin(14°)=0,242). Le rayon de
+zone de service, lui, reste saisi en degrés (angle physique) ; seul son tracé
+sur les cartes est converti en rayon de cosinus directeur (sin) pour rester
+cohérent avec les axes.</p>
 
 <h3>Exports</h3>
 <ul>
