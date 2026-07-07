@@ -174,12 +174,6 @@ def build_reflector_result(
     zone_radius_deg: float,
     grid: UVGrid,
     defocus_m: float = 0.0,
-    phase_error_rms_rad: float = 0.0,
-    phase_corr_length_m: float = 0.05,
-    phase_error_seed: int = 0,
-    phase_error_shared_rms_rad: float = 0.0,
-    footprint_m: float = 0.0,
-    footprint_magnification: float = 0.0,
     n_aperture: int = 128,
     pad_factor: int = 4,
 ) -> ReflectorResult:
@@ -194,12 +188,6 @@ def build_reflector_result(
         positions_m=hex_feed_positions(pitch_m, n_feeds, focal_radius_m=10.0 * pitch_m),
         q=q,
         defocus_m=defocus_m,
-        phase_error_rms_rad=phase_error_rms_rad,
-        phase_corr_length_m=phase_corr_length_m,
-        phase_error_seed=phase_error_seed,
-        phase_error_shared_rms_rad=phase_error_shared_rms_rad,
-        footprint_m=footprint_m,
-        footprint_magnification=footprint_magnification,
     )
     co, cross = synthesize_reflector_fields(
         spec, feeds, grid, n_aperture=n_aperture, pad_factor=pad_factor
@@ -427,23 +415,19 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         self._zoom_cache_key: tuple[Any, ...] | None = None
         self._zoom_cache_result: ReflectorResult | None = None
 
-        # Paramètres réflecteur — diamètre physique réaliste par défaut (2.2 m) ;
-        # avec le modèle deux échelles, l'ouverture effective par élément est
-        # gouvernée par l'empreinte (voir groupe "Réseau de feeds"), pas par ce
-        # diamètre.
-        self._diameter = self._dspin(0.1, 25.0, 2.2, 0.1)
+        # Paramètres réflecteur — défaut sur une petite ouverture effective
+        # (0.28 m) : lobe élémentaire large (~un quart de l'affichage) avec
+        # anneaux d'Airy, et phase propre (le carrier far-field d'une petite
+        # ouverture offset reste sous le seuil d'aliasing de la grille
+        # d'affichage, contrairement à un grand réflecteur).
+        self._diameter = self._dspin(0.1, 25.0, 0.28, 0.1)
         self._f_over_d = self._dspin(0.5, 4.0, 1.2, 0.1)
-        self._offset = self._dspin(0.0, 5.0, 0.0, 0.05)
+        self._offset = self._dspin(0.0, 5.0, 0.15, 0.05)
         self._freq_ghz = self._dspin(1.0, 100.0, 20.0, 1.0)
         self._q = self._dspin(0.5, 20.0, 2.0, 0.5)
         self._pitch = self._dspin(0.002, 0.5, 0.03, 0.001, decimals=3)
         self._n_feeds = self._ispin(1, 127, 7)
         self._defocus = self._dspin(-5.0, 5.0, 0.0, 0.1)
-        self._phase_rms = self._dspin(0.0, 3.0, 0.0, 0.05, decimals=2)
-        self._phase_shared_rms = self._dspin(0.0, 3.0, 0.0, 0.05, decimals=2)
-        self._phase_corr = self._dspin(0.005, 0.5, 0.05, 0.005, decimals=3)
-        self._footprint = self._dspin(0.0, 5.0, 0.0, 0.01, decimals=3)
-        self._footprint_mag = self._dspin(-200.0, 200.0, 0.0, 1.0, decimals=2)
         # bornes zone : [6, 14]° conforme à ServiceZone
         self._zone_radius = self._dspin(6.0, 14.0, 8.0, 0.5)
         self._feed_idx = self._ispin(0, 0, 0)
@@ -468,11 +452,6 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         ff.addRow("Pas pitch (m)", self._pitch)
         ff.addRow("N feeds", self._n_feeds)
         ff.addRow("Defocus (m)", self._defocus)
-        ff.addRow("σ par feed (rad)", self._phase_rms)
-        ff.addRow("σ commun (rad)", self._phase_shared_rms)
-        ff.addRow("Corrélation (m)", self._phase_corr)
-        ff.addRow("Empreinte (m)", self._footprint)
-        ff.addRow("Magnification", self._footprint_mag)
         zone_grp = QGroupBox("Zone de service")
         zf = QFormLayout(zone_grp)
         zf.addRow("Rayon zone (°)", self._zone_radius)
@@ -551,11 +530,6 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
                     zone_radius_deg=self._zone_radius.value(),
                     grid=grid,
                     defocus_m=self._defocus.value(),
-                    phase_error_rms_rad=self._phase_rms.value(),
-                    phase_corr_length_m=self._phase_corr.value(),
-                    phase_error_shared_rms_rad=self._phase_shared_rms.value(),
-                    footprint_m=self._footprint.value(),
-                    footprint_magnification=self._footprint_mag.value(),
                 )
             except ValueError as exc:
                 QMessageBox.warning(self, "Génération impossible", str(exc))
@@ -606,11 +580,6 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
             self._pitch.value(),
             float(self._n_feeds.value()),
             self._defocus.value(),
-            self._phase_rms.value(),
-            self._phase_shared_rms.value(),
-            self._phase_corr.value(),
-            self._footprint.value(),
-            self._footprint_mag.value(),
             self._zone_radius.value(),
         )
 
@@ -640,11 +609,6 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
             zone_radius_deg=self._zone_radius.value(),
             grid=zoom_grid,
             defocus_m=self._defocus.value(),
-            phase_error_rms_rad=self._phase_rms.value(),
-            phase_corr_length_m=self._phase_corr.value(),
-            phase_error_shared_rms_rad=self._phase_shared_rms.value(),
-            footprint_m=self._footprint.value(),
-            footprint_magnification=self._footprint_mag.value(),
         )
         self._zoom_cache_key = key
         self._zoom_cache_result = result
@@ -755,11 +719,6 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
             n_feeds=self._n_feeds.value(),
             zone_radius_deg=self._zone_radius.value(),
             defocus_m=self._defocus.value(),
-            phase_error_rms_rad=self._phase_rms.value(),
-            phase_corr_length_m=self._phase_corr.value(),
-            phase_error_shared_rms_rad=self._phase_shared_rms.value(),
-            footprint_m=self._footprint.value(),
-            footprint_magnification=self._footprint_mag.value(),
         )
 
     def _on_export_grd(self) -> None:
@@ -806,11 +765,8 @@ faisceau <i>formé</i> vers une cible.</p>
 <table cellpadding="4">
 <tr><th align="left">Paramètre</th><th align="left">Définition exacte</th></tr>
 <tr><td><b>Diamètre (m)</b></td>
-    <td>Diamètre <i>D</i> physique du réflecteur (disque réel, ex. 2,2 m). Avec
-    une Empreinte &gt; 0, ce diamètre fixe l'étendue du grand réflecteur, mais
-    <i>pas</i> la largeur de faisceau élémentaire par feed : voir Empreinte
-    ci-dessous (modèle deux échelles). Sans empreinte (=0, pleine ouverture),
-    <i>D</i> gouverne directement θ₃dB ≈ 1,15·λ/<i>D</i>.</td></tr>
+    <td>Diamètre <i>D</i> physique du réflecteur (disque réel). Gouverne
+    directement la largeur de faisceau θ₃dB ≈ 1,15·λ/<i>D</i>.</td></tr>
 <tr><td><b>F/D</b></td>
     <td>Rapport focale/diamètre. La focale vaut <i>F</i> = (F/D)·<i>D</i>. Gouverne
     le dépointage par feed (θ ≈ BDF·offset/<i>F</i>, donc ∝ 1/<i>F</i>) et
@@ -838,41 +794,6 @@ faisceau <i>formé</i> vers une cible.</p>
     pattern par feed (crête plus basse, enveloppe plus large) ; le beamforming
     (filtre adapté déjà en place) refocalise et recombine partiellement
     l'énergie perdue, sans l'annuler entièrement.</td></tr>
-<tr><td><b>σ par feed (rad)</b></td>
-    <td>Écart-type de l'écran de phase aléatoire corrélé propre à chaque feed
-    (erreurs type Ruze : imperfections de surface/alignement statistiques
-    individuelles, RNG dédié par feed). Ce terme <i>disperse</i> : il dégrade
-    chaque feed de façon indépendante, donc augmente la dispersion de crête
-    d'un feed à l'autre en plus de la dégradation moyenne (crête ↓, lobes
-    secondaires ↑) — indépendamment du pitch. σ=0 (défaut) : aucun écran,
-    comportement inchangé.</td></tr>
-<tr><td><b>σ commun (rad)</b></td>
-    <td>Écart-type de l'écran de phase aléatoire corrélé COMMUN à tous les
-    feeds (erreurs de surface du réflecteur lui-même, un seul écran partagé).
-    Ce terme dégrade chaque feed de la même façon (crête ↓, lobes secondaires
-    ↑) <i>sans</i> disperser les crêtes entre feeds, contrairement au σ par
-    feed. σ=0 (défaut) : aucun écran commun.</td></tr>
-<tr><td><b>Corrélation (m)</b></td>
-    <td>Longueur de corrélation spatiale du lissage gaussien appliqué aux deux
-    bruits de phase (par feed et commun) : contrôle l'échelle du « speckle »
-    (grain fin ⇒ corrélation courte, texture plus large ⇒ corrélation
-    longue), à σ fixé.
-    Sans effet si σ=0.</td></tr>
-<tr><td><b>Empreinte (m)</b></td>
-    <td>Modèle deux échelles : le Diamètre ci-dessus est le vrai réflecteur
-    physique, mais chaque feed n'en illumine qu'une empreinte gaussienne
-    limitée, de ce diamètre (FWHM en amplitude). C'est elle, et non plus le
-    diamètre du réflecteur, qui fixe la largeur de faisceau et le gain
-    élémentaires par feed. 0 (défaut) : désactivée, pleine ouverture,
-    comportement inchangé.</td></tr>
-<tr><td><b>Magnification</b></td>
-    <td>Déplacement du centre de l'empreinte par mètre de décalage du feed
-    dans le plan focal (m/m) : en balayant le cluster de feeds, les
-    empreintes se déplacent sur le grand réflecteur et pavent une zone plus
-    large que l'empreinte seule. Le beam formé (rangée du bas) recombine
-    alors ces empreintes en une pleine ouverture effective — c'est l'intérêt
-    de la magnification. 0 (défaut) : empreinte centrée pour tous les feeds
-    (pas de balayage). Sans effet si Empreinte=0.</td></tr>
 <tr><td><b>Rayon zone (°)</b></td>
     <td>Rayon du disque de service, tracé en cercle blanc pointillé sur toutes les
     cartes (u,v). N'agit pas sur les champs, seulement sur l'affichage.</td></tr>
@@ -900,7 +821,7 @@ géométrie offset.</li>
 wᵢ = conj(Eᵢ(cible)) normalisés en norme L2 ⇒ la crête touche l'enveloppe max
 par élément au point visé.</li>
 <li><b>Beam formé — zoom</b> : la crête du beam formé pleine ouverture est large de
-~λ/D<sub>physique</sub> (ex. ~0,35° à 20 GHz/2,2 m) — souvent moins large qu'un
+~λ/D<sub>physique</sub> (ex. ~0,43° à 20 GHz/2 m) — souvent moins large qu'un
 pixel de la grille d'affichage ±14°/81px, donc invisible dans le panneau
 directivité (axe 4), qui ne montre alors que le plancher de speckle. Le panneau
 zoom (axe 5) ré-échantillonne les champs sur une fenêtre ±2° centrée sur la
@@ -912,7 +833,7 @@ cohérente, lisse) ; « Enveloppe max par élément » = max des faisceaux
 individuels sans recombinaison (montre le festonnage réel). Comparer une cible
 de gain à la seconde, pas à la première.</li>
 <li><b>Phase dé-référencée</b> : le panneau phase du feed (axe 1) retire, pour
-l'affichage seulement, la porteuse linéaire exp(i·k·Y₀·sin v) due au centre
+l'affichage seulement, la porteuse linéaire exp(-i·k·Y₀·sin v) due au centre
 d'ouverture décalé Y₀ (offset clearance + D/2) — sans elle, cette porteuse se
 replie en rayures (moiré) sur la grille d'affichage grossière. Les champs
 utilisés pour le beamforming et les exports GRD restent inchangés (vérité

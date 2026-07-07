@@ -38,47 +38,6 @@ défocalisé est repositionné/repointé pour recentrer la couverture).
 disque d'ouverture, le plan a + b·X + c·Y ajusté à `k·δz·(1 − cosψ)` avant de
 l'ajouter à la phase ; le résidu ne contient plus que l'étalement symétrique
 recherché.
-
-Écran de phase aléatoire corrélé (erreurs type Ruze) : `random_phase_screen`
-modélise les erreurs de surface/alignement statistiques d'un feed par un
-champ de phase aléatoire mais spatialement corrélé sur l'ouverture. Le champ
-brut est un bruit blanc gaussien N(0,1) échantillonné sur la grille complète
-(RNG dédié, un par feed) ; il est lissé par un filtre passe-bas gaussien de
-longueur caractéristique `corr_length_m`, réalisé en numpy pur par
-convolution dans le domaine spectral (`np.fft.rfft2`/`irfft2`, sans
-dépendance scipy) — le pas physique `dx` de la grille convertit cette
-longueur en pixels. Le résultat est recentré (moyenne nulle sur `inside`)
-puis renormalisé pour que son écart-type sur `inside` vaille exactement
-`rms_rad` (radians). Contrairement au defocus, aucune composante plane n'est
-retirée : l'errance de pointage aléatoire par feed qu'introduit le bruit
-basse fréquence est un effet recherché, qui reproduit la dispersion des
-centres de faisceau observée sur données réelles (le pitch, lui, ne pilote
-que l'espacement nominal des faisceaux).
-
-Modèle deux échelles (empreinte d'illumination) : `diameter_m` redevient le
-vrai diamètre physique du réflecteur, mais un feed donné n'en illumine
-physiquement qu'une empreinte limitée — pas la pleine ouverture.
-`footprint_amplitude_mask` modélise cette empreinte par un masque gaussien
-en amplitude, de diamètre à mi-hauteur (FWHM, en amplitude) `footprint_m` :
-
-    mask(X,Y) = exp(-4·ln2·(r/footprint_m)²)
-
-où r est la distance du point d'ouverture au centre de l'empreinte. Ce
-masque multiplie le taper cos^q(ψ) existant dans `aperture_field` : c'est
-lui, et non plus le diamètre du réflecteur, qui fixe la largeur du lobe et
-le gain élémentaires. Le centre de l'empreinte par défaut (magnification=0)
-est le centre du disque d'ouverture `(0, aperture_center_y_m)` ; un feed
-décalé de (δx, δy) dans le plan focal déplace ce centre de
-`magnification·(δx, δy)` — la magnification convertit un déplacement feed
-(petit, dans le plan focal) en déplacement d'empreinte (potentiellement bien
-plus grand, sur le disque physique), ce qui permet à un cluster de feeds de
-faire paver leurs empreintes sur toute l'ouverture ; le beam formé
-(`synth_afr.form_beam`) recombine alors ces empreintes en une pleine
-ouverture effective. `footprint_m == 0.0` désactive le masque (pleine
-ouverture, comportement strictement inchangé). Si l'empreinte déborde du
-disque (magnification × décalage trop grand), elle est simplement tronquée
-par le masque `inside` existant — pas d'erreur, juste une empreinte
-partiellement hors du réflecteur (moins d'énergie captée, cf. tests).
 """
 
 import numpy as np
@@ -130,73 +89,6 @@ def _fit_plane(
     return plane
 
 
-def random_phase_screen(
-    X: FloatArray,
-    Y: FloatArray,
-    inside: NDArray[np.bool_],
-    dx: float,
-    rms_rad: float,
-    corr_length_m: float,
-    rng: np.random.Generator,
-) -> FloatArray:
-    """Écran de phase aléatoire corrélé (erreurs type Ruze) sur la grille d'ouverture.
-
-    Bruit blanc gaussien N(0,1) (`rng`, dédié à l'appelant) sur la grille
-    complète, lissé par un filtre passe-bas gaussien de longueur
-    caractéristique `corr_length_m` (m) — convolution réalisée dans le
-    domaine spectral (FFT 2D réelle, noyau gaussien périodique construit
-    dans le domaine spatial), numpy pur, sans dépendance scipy. `dx` (m) est
-    le pas physique de la grille, nécessaire pour convertir `corr_length_m`
-    en écart-type du noyau exprimé en pixels.
-
-    La moyenne sur `inside` est retirée puis le champ est renormalisé pour
-    que son écart-type sur `inside` vaille exactement `rms_rad` (radians).
-    Aucune composante plane n'est retirée (contrairement à `defocus_m`) :
-    l'errance de pointage aléatoire par feed que cela introduit est un effet
-    recherché (voir docstring du module).
-    """
-    noise = rng.standard_normal(X.shape)
-    n_y, n_x = X.shape
-    sigma_px = corr_length_m / dx
-    iy = (np.arange(n_y) + n_y // 2) % n_y - n_y // 2
-    ix = (np.arange(n_x) + n_x // 2) % n_x - n_x // 2
-    grid_ix, grid_iy = np.meshgrid(ix, iy)
-    kernel = np.exp(-(grid_ix**2 + grid_iy**2) / (2.0 * sigma_px**2))
-    kernel /= kernel.sum()
-    smoothed: FloatArray = np.fft.irfft2(
-        np.fft.rfft2(noise) * np.fft.rfft2(kernel), s=X.shape
-    )
-    centered = smoothed - smoothed[inside].mean()
-    std_inside = centered[inside].std()
-    screen: FloatArray = centered * (rms_rad / std_inside)
-    return screen
-
-
-def footprint_amplitude_mask(
-    X: FloatArray,
-    Y: FloatArray,
-    feed_xy: tuple[float, float],
-    aperture_center_y_m: float,
-    footprint_m: float,
-    magnification: float,
-) -> FloatArray:
-    """Masque d'amplitude gaussien de l'empreinte d'illumination d'un feed.
-
-    `footprint_m` est le diamètre FWHM (à mi-hauteur, en amplitude — pas en
-    puissance) de l'empreinte ; le centre est `(0, aperture_center_y_m) +
-    magnification·feed_xy` (voir docstring du module pour la justification
-    physique). Précondition : `footprint_m > 0` (appelant : ne pas invoquer
-    à `footprint_m == 0`, cf. `aperture_field`).
-    """
-    dxf, dyf = feed_xy
-    cx = magnification * dxf
-    cy = aperture_center_y_m + magnification * dyf
-    r2 = (X - cx) ** 2 + (Y - cy) ** 2
-    k = 4.0 * np.log(2.0) / footprint_m**2
-    mask: FloatArray = np.exp(-k * r2)
-    return mask
-
-
 def aperture_field(
     spec: ReflectorSpec,
     feed_xy: tuple[float, float],
@@ -205,9 +97,6 @@ def aperture_field(
     inside: NDArray[np.bool_],
     q: float,
     defocus_m: float = 0.0,
-    extra_phase: FloatArray | None = None,
-    footprint_m: float = 0.0,
-    footprint_magnification: float = 0.0,
 ) -> ComplexArray:
     """Champ scalaire d'ouverture pour un feed : taper cos^q(ψ) + tilt + defocus.
 
@@ -222,25 +111,9 @@ def aperture_field(
     reste du plan ne coûte rien.
     Avec `defocus_m=0.0`, le champ est strictement inchangé (early-out : pas
     de résolution moindres carrés à payer).
-
-    `extra_phase`, si fourni, est simplement ajouté à la phase totale (tilt +
-    defocus) avant l'exponentielle complexe — typiquement l'écran de phase
-    aléatoire construit par l'appelant via `random_phase_screen` (l'appelant
-    porte le contexte par-feed : RNG seedé, paramètres). Avec
-    `extra_phase=None`, le champ est strictement inchangé.
-
-    `footprint_m` (> 0) multiplie le taper cos^q(ψ) par le masque gaussien
-    `footprint_amplitude_mask` (voir docstring du module) : modèle deux
-    échelles où le feed n'illumine qu'une empreinte limitée du réflecteur.
-    Avec `footprint_m=0.0` (défaut), aucun masque n'est calculé ni appliqué,
-    le champ est strictement inchangé (même early-out que `defocus_m`).
     """
     psi = illumination_angle(X, Y, spec.focal_length_m)
     amp = np.cos(psi) ** q
-    if footprint_m != 0.0:
-        amp = amp * footprint_amplitude_mask(
-            X, Y, feed_xy, spec.aperture_center_y_m, footprint_m, footprint_magnification
-        )
     k = 2.0 * np.pi / spec.wavelength_m
     dxf, dyf = feed_xy
     tilt = -k * spec.beam_deviation_factor * (dxf * X + dyf * Y) / spec.focal_length_m
@@ -250,8 +123,6 @@ def aperture_field(
         raw_defocus_phase = k * defocus_m * (1.0 - np.cos(psi))
         defocus_phase = raw_defocus_phase - _fit_plane(X, Y, raw_defocus_phase, inside)
     total_phase = tilt + defocus_phase
-    if extra_phase is not None:
-        total_phase = total_phase + extra_phase
     field: ComplexArray = (inside * amp * np.exp(1j * total_phase)).astype(np.complex128)
     return field
 

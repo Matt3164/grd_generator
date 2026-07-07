@@ -10,14 +10,6 @@ from grd_generator.synth import hex_centers_uv
 
 FloatArray = NDArray[np.float64]
 
-# Décalage de seed pour l'écran de phase COMMUN (`phase_error_shared_rms_rad`),
-# ajouté à `phase_error_seed` plutôt que soustrait : `np.random.default_rng`
-# rejette les seeds négatifs, et `phase_error_seed` vaut 0 par défaut (donc
-# `seed - 1` casserait le cas par défaut). Un grand décalage fixe reste
-# distinct de tous les seeds par-feed `phase_error_seed + i` pour tout nombre
-# de feeds réaliste (i < _SHARED_SEED_OFFSET).
-_SHARED_SEED_OFFSET = 1_000_003
-
 
 def hex_feed_positions(
     pitch_m: float, n_feeds: int, focal_radius_m: float
@@ -57,18 +49,21 @@ def dereference_phase(
 
     Un centre d'ouverture excentré en Y₀ = `aperture_center_y_m` (offset) impose au
     champ lointain une porteuse de phase quasi-linéaire en v :
-    `exp(i·k·Y₀·sin v)` (k = 2π/λ). Sur une grille d'affichage grossière, cette
-    porteuse se replie visuellement en rayures horizontales (moiré) qui masquent la
-    structure de phase utile. Cette fonction ne change PAS la physique : elle
-    retire cette porteuse *pour l'affichage seul*, en renvoyant
-    `angle(field · exp(-i·k·Y₀·sin v))`. Les champs utilisés pour le beamforming
-    (`form_beam`) et les exports GRD doivent rester les champs bruts, pas ce
-    résultat.
+    `exp(-i·k·Y₀·sin v)` (k = 2π/λ) — signe hérité de la convention de
+    `numpy.fft.fft2` utilisée par `farfield.far_field_fft` (TF directe en
+    exp(-i·2π·f·x) : un décalage +Y₀ de l'ouverture multiplie son spectre par
+    exp(-i·2π·f·Y₀) = exp(-i·k·Y₀·sin v)). Sur une grille d'affichage grossière,
+    cette porteuse se replie visuellement en rayures horizontales (moiré) qui
+    masquent la structure de phase utile. Cette fonction ne change PAS la
+    physique : elle retire cette porteuse *pour l'affichage seul*, en renvoyant
+    `angle(field · exp(i·k·Y₀·sin v))` (conjugué de la porteuse, pour
+    l'annuler). Les champs utilisés pour le beamforming (`form_beam`) et les
+    exports GRD doivent rester les champs bruts, pas ce résultat.
     """
     _, gv = grid.meshgrid()
     k = 2.0 * np.pi / wavelength_m
     m = np.sin(np.deg2rad(gv))
-    carrier = np.exp(-1j * k * aperture_center_y_m * m)
+    carrier = np.exp(1j * k * aperture_center_y_m * m)
     dereferenced: FloatArray = np.angle(field * carrier)
     return dereferenced
 
@@ -83,72 +78,16 @@ def synthesize_reflector_fields(
 ) -> tuple[list[ComplexField], list[ComplexField]]:
     """Pour chaque feed : champ co-pol et cross-pol (u,v), normalisés en directivité.
 
-    Si `feeds.phase_error_rms_rad > 0`, un écran de phase aléatoire corrélé
-    (`optics.random_phase_screen`) est construit par feed avec un RNG dédié
-    `np.random.default_rng(feeds.phase_error_seed + i)` (i = indice du feed
-    dans `positions_m`) et ajouté à la phase d'ouverture — déterministe :
-    mêmes spec/feeds → mêmes champs. Si `phase_error_rms_rad == 0`, aucun RNG
-    n'est instancié et le comportement est strictement identique à l'absence
-    d'écran.
-
-    Si `feeds.phase_error_shared_rms_rad > 0`, un second écran, COMMUN à tous
-    les feeds (erreurs de surface du réflecteur, par opposition aux erreurs
-    propres au feed ci-dessus), est construit une seule fois avec
-    `np.random.default_rng(feeds.phase_error_seed + _SHARED_SEED_OFFSET)`
-    (seed distinct de tous les seeds par-feed `phase_error_seed + i`, i >= 0
-    — voir commentaire module) et ajouté à l'écran de chaque feed (les deux
-    écrans se cumulent par simple somme). Si les deux rms sont nuls, aucun
-    RNG n'est instancié et le comportement est strictement identique à
-    l'absence d'écran.
-
-    Si `feeds.footprint_m > 0`, le taper cos^q(ψ) de chaque feed est en outre
-    multiplié par le masque gaussien `optics.footprint_amplitude_mask` (modèle
-    deux échelles : le feed n'illumine qu'une empreinte limitée du réflecteur,
-    voir docstring du module `optics`). Sans effet si `footprint_m == 0.0`.
-
-    Règle d'échantillonnage : `n_aperture` fixe le pas physique de la grille
-    `dx = diameter_m / n_aperture` (voir `optics.aperture_grid`). Ce pas doit
-    rester petit devant les échelles physiques modélisées pour ne pas les
-    sous-résoudre : `dx ≲ phase_corr_length_m / 3` (écran de phase, sans quoi
-    le filtre gaussien de `random_phase_screen` est appliqué à un bruit déjà
-    trop grossier) et `dx ≲ footprint_m / 20` (empreinte, sans quoi son profil
-    gaussien est mal échantillonné). Avec un grand réflecteur physique
-    (`diameter_m` réaliste, ex. 2,2 m) et une petite empreinte/corrélation, il
-    faut donc augmenter `n_aperture` en conséquence (ex. plusieurs centaines).
+    `n_aperture` fixe le pas physique de la grille `dx = diameter_m /
+    n_aperture` (voir `optics.aperture_grid`) ; `pad_factor` contrôle le
+    zéro-padding, donc la résolution angulaire du far-field.
     """
     X, Y, inside, dx = optics.aperture_grid(spec, n_aperture, pad_factor)
     ex, ey = optics.aperture_pol_vectors(spec, X, Y)
     co_fields: list[ComplexField] = []
     cross_fields: list[ComplexField] = []
 
-    shared_screen = None
-    if feeds.phase_error_shared_rms_rad > 0.0:
-        shared_rng = np.random.default_rng(feeds.phase_error_seed + _SHARED_SEED_OFFSET)
-        shared_screen = optics.random_phase_screen(
-            X,
-            Y,
-            inside,
-            dx,
-            rms_rad=feeds.phase_error_shared_rms_rad,
-            corr_length_m=feeds.phase_corr_length_m,
-            rng=shared_rng,
-        )
-
-    for i, feed_xy in enumerate(feeds.positions_m):
-        extra_phase = None
-        if feeds.phase_error_rms_rad > 0.0:
-            rng = np.random.default_rng(feeds.phase_error_seed + i)
-            extra_phase = optics.random_phase_screen(
-                X,
-                Y,
-                inside,
-                dx,
-                rms_rad=feeds.phase_error_rms_rad,
-                corr_length_m=feeds.phase_corr_length_m,
-                rng=rng,
-            )
-        if shared_screen is not None:
-            extra_phase = shared_screen if extra_phase is None else extra_phase + shared_screen
+    for feed_xy in feeds.positions_m:
         scalar = optics.aperture_field(
             spec,
             feed_xy,
@@ -157,9 +96,6 @@ def synthesize_reflector_fields(
             inside,
             feeds.q,
             defocus_m=feeds.defocus_m,
-            extra_phase=extra_phase,
-            footprint_m=feeds.footprint_m,
-            footprint_magnification=feeds.footprint_magnification,
         )
         Fx, L, M = farfield.far_field_fft(scalar * ex, dx, spec.wavelength_m)
         Fy, _, _ = farfield.far_field_fft(scalar * ey, dx, spec.wavelength_m)
