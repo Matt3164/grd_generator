@@ -84,6 +84,36 @@ def test_build_reflector_result_with_shared_phase_error() -> None:
     assert res.co_fields[0].shape == (41, 41)
 
 
+def test_build_reflector_result_with_footprint() -> None:
+    grid = UVGrid(u_min=-14, u_max=14, v_min=-14, v_max=14, n_u=41, n_v=41)
+    res = build_reflector_result(
+        diameter_m=2.2, f_over_d=1.2, offset_clearance_m=0.0, freq_ghz=20.0,
+        q=2.0, pitch_m=0.004, n_feeds=7, zone_radius_deg=8.0, grid=grid,
+        footprint_m=0.28, footprint_magnification=48.0,
+        n_aperture=200, pad_factor=2,
+    )
+    assert isinstance(res, ReflectorResult)
+    assert len(res.co_fields) == 7
+    assert res.co_fields[0].shape == (41, 41)
+
+
+def test_build_reflector_result_n_aperture_pad_factor_defaults_unchanged() -> None:
+    # Les défauts n_aperture=128/pad_factor=4 restent ceux de synth_afr :
+    # exposer ces kwargs ne doit rien changer sans les fournir explicitement.
+    grid = UVGrid(u_min=-14, u_max=14, v_min=-14, v_max=14, n_u=41, n_v=41)
+    res_default = build_reflector_result(
+        diameter_m=2.0, f_over_d=1.2, offset_clearance_m=0.0, freq_ghz=20.0,
+        q=2.0, pitch_m=0.03, n_feeds=7, zone_radius_deg=8.0, grid=grid,
+    )
+    res_explicit = build_reflector_result(
+        diameter_m=2.0, f_over_d=1.2, offset_clearance_m=0.0, freq_ghz=20.0,
+        q=2.0, pitch_m=0.03, n_feeds=7, zone_radius_deg=8.0, grid=grid,
+        n_aperture=128, pad_factor=4,
+    )
+    for a, b in zip(res_default.co_fields, res_explicit.co_fields, strict=True):
+        np.testing.assert_array_equal(a, b)
+
+
 def test_build_result_is_reproducible() -> None:
     kw = dict(
         antenna_lat=46.6, antenna_lon=2.5, sat_lon=3.0, zone_radius_deg=6.0,
@@ -143,4 +173,31 @@ def test_reflector_studio_phase_error_spinboxes() -> None:
     assert studio._phase_shared_rms.value() == pytest.approx(0.0)
     studio._phase_shared_rms.setValue(1.2)
     assert studio._phase_shared_rms.value() == pytest.approx(1.2)
+    studio.close()
+
+
+def test_reflector_studio_footprint_spinboxes() -> None:
+    """Régression : les spinbox empreinte (3 décimales) et magnification."""
+    import os
+
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    os.environ.setdefault("MPLBACKEND", "Agg")
+    from PyQt6.QtWidgets import QApplication
+
+    from grd_generator.gui import ReflectorStudio
+
+    _app = QApplication.instance() or QApplication([])
+    studio = ReflectorStudio(n_u=21, n_v=21)
+    assert studio._footprint.decimals() == 3
+    assert studio._footprint.minimum() == pytest.approx(0.0)
+    assert studio._footprint.maximum() == pytest.approx(5.0)
+    assert studio._footprint.value() == pytest.approx(0.0)
+    studio._footprint.setValue(0.28)
+    assert studio._footprint.value() == pytest.approx(0.28)
+
+    assert studio._footprint_mag.minimum() == pytest.approx(-200.0)
+    assert studio._footprint_mag.maximum() == pytest.approx(200.0)
+    assert studio._footprint_mag.value() == pytest.approx(0.0)
+    studio._footprint_mag.setValue(48.0)
+    assert studio._footprint_mag.value() == pytest.approx(48.0)
     studio.close()

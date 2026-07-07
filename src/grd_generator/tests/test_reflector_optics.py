@@ -208,3 +208,99 @@ def test_shared_extra_phase_ratio_identical_across_feeds() -> None:
     ratio_a = field_a_shared[inside] / field_a_plain[inside]
     ratio_b = field_b_shared[inside] / field_b_plain[inside]
     np.testing.assert_allclose(ratio_a, ratio_b, atol=1e-9)
+
+
+def test_footprint_amplitude_mask_fwhm_convention() -> None:
+    # FWHM en amplitude : mask=1 au centre, mask=0.5 à r=footprint_m/2 (demi-largeur
+    # à mi-hauteur), quel que soit le centre choisi (ici centre par défaut,
+    # magnification=0 -> centre = (0, aperture_center_y_m)).
+    spec = _spec()
+    footprint_m = 0.2
+    y0 = spec.aperture_center_y_m
+    X = np.array([[0.0, footprint_m / 2.0, footprint_m]])
+    Y = np.array([[y0, y0, y0]])
+    mask = optics.footprint_amplitude_mask(X, Y, (0.0, 0.0), y0, footprint_m, 0.0)
+    assert mask[0, 0] == pytest.approx(1.0)
+    assert mask[0, 1] == pytest.approx(0.5, rel=1e-9)
+    assert mask[0, 2] == pytest.approx(0.0625, rel=1e-9)  # exp(-4 ln2) = 2^-4
+
+
+def test_footprint_amplitude_mask_moves_with_magnification() -> None:
+    spec = _spec()
+    y0 = spec.aperture_center_y_m
+    X = np.array([[0.3, 0.0]])
+    Y = np.array([[y0, y0]])
+    feed_xy = (0.01, 0.0)
+    magnification = 30.0
+    mask = optics.footprint_amplitude_mask(X, Y, feed_xy, y0, 0.2, magnification)
+    # Centre attendu déplacé en X de magnification*dxf = 0.3 : le point (0.3,y0)
+    # est donc au centre de l'empreinte (mask=1), le point (0,y0) en est loin.
+    assert mask[0, 0] == pytest.approx(1.0)
+    assert mask[0, 1] < mask[0, 0]
+
+
+def test_aperture_field_footprint_zero_is_identical_to_default() -> None:
+    spec = _spec()
+    X, Y, inside, dx = optics.aperture_grid(spec, n_aperture=32, pad_factor=2)
+    field_default = optics.aperture_field(spec, (0.01, 0.0), X, Y, inside, q=2.0)
+    field_explicit_zero = optics.aperture_field(
+        spec, (0.01, 0.0), X, Y, inside, q=2.0, footprint_m=0.0
+    )
+    np.testing.assert_array_equal(field_default, field_explicit_zero)
+
+
+def test_aperture_field_footprint_multiplies_amplitude_by_mask() -> None:
+    spec = _spec()
+    X, Y, inside, dx = optics.aperture_grid(spec, n_aperture=32, pad_factor=2)
+    feed_xy = (0.01, -0.005)
+    footprint_m = 0.3
+    magnification = 5.0
+    field_base = optics.aperture_field(spec, feed_xy, X, Y, inside, q=2.0)
+    field_footprint = optics.aperture_field(
+        spec,
+        feed_xy,
+        X,
+        Y,
+        inside,
+        q=2.0,
+        footprint_m=footprint_m,
+        footprint_magnification=magnification,
+    )
+    expected_mask = optics.footprint_amplitude_mask(
+        X, Y, feed_xy, spec.aperture_center_y_m, footprint_m, magnification
+    )
+    ratio = np.abs(field_footprint[inside]) / np.abs(field_base[inside])
+    np.testing.assert_allclose(ratio, expected_mask[inside], atol=1e-9)
+    # La phase n'est pas affectée par le masque d'amplitude (pur réel positif).
+    phase_ratio = np.angle(field_footprint[inside] / field_base[inside])
+    np.testing.assert_allclose(phase_ratio, np.zeros_like(phase_ratio), atol=1e-9)
+
+
+def test_footprint_magnification_shifts_energy_centroid() -> None:
+    # Le centroïde d'énergie du champ d'ouverture (empreinte gaussienne, taper
+    # cos^q quasi constant sur l'empreinte car F >> footprint_m) doit se
+    # déplacer d'environ magnification·(δx, δy) par rapport au centre nominal
+    # (0, aperture_center_y_m). D=2.2m, F/D=1.2 -> F=2.64m, très grand devant
+    # footprint=0.28m : psi varie peu sur l'empreinte, taper quasi uniforme.
+    spec = ReflectorSpec(diameter_m=2.2, focal_length_m=1.2 * 2.2, freq_hz=20e9)
+    X, Y, inside, dx = optics.aperture_grid(spec, n_aperture=200, pad_factor=2)
+    footprint_m = 0.28
+    magnification = 48.0
+    feed_xy = (0.002, 0.001)  # petit décalage transverse (mm), pas de troncature au bord
+    field = optics.aperture_field(
+        spec,
+        feed_xy,
+        X,
+        Y,
+        inside,
+        q=2.0,
+        footprint_m=footprint_m,
+        footprint_magnification=magnification,
+    )
+    power = np.abs(field[inside]) ** 2
+    cx = float(np.sum(X[inside] * power) / np.sum(power))
+    cy = float(np.sum(Y[inside] * power) / np.sum(power))
+    expected_cx = magnification * feed_xy[0]
+    expected_cy = spec.aperture_center_y_m + magnification * feed_xy[1]
+    assert cx == pytest.approx(expected_cx, abs=0.01)
+    assert cy == pytest.approx(expected_cy, abs=0.01)

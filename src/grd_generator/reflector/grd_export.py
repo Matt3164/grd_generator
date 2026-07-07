@@ -83,6 +83,8 @@ def simulation_params_dict(
     phase_corr_length_m: float = 0.05,
     phase_error_seed: int = 0,
     phase_error_shared_rms_rad: float = 0.0,
+    footprint_m: float = 0.0,
+    footprint_magnification: float = 0.0,
 ) -> dict[str, Any]:
     """Dict sérialisable JSON des paramètres de simulation (focale dérivée incluse)."""
     return {
@@ -100,4 +102,6 @@ def simulation_params_dict(
         "phase_corr_length_m": phase_corr_length_m,
         "phase_error_seed": phase_error_seed,
         "phase_error_shared_rms_rad": phase_error_shared_rms_rad,
+        "footprint_m": footprint_m,
+        "footprint_magnification": footprint_magnification,
     }
