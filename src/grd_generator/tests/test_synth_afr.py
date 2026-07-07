@@ -4,6 +4,7 @@ import pytest
 from grd_generator.reflector import (
     FeedSpec,
     ReflectorSpec,
+    dereference_phase,
     form_beam,
     hex_feed_positions,
     synthesize_reflector_fields,
@@ -417,3 +418,57 @@ def test_footprint_truncation_at_edge_does_not_error_and_stays_nonzero() -> None
     assert np.all(np.isfinite(co[0]))
     assert np.all(np.isfinite(cross[0]))
     assert np.any(np.abs(co[0]) > 0.0)
+
+
+def test_dereference_phase_removes_pure_carrier() -> None:
+    # Un champ qui N'EST QUE la porteuse exp(i·k·Y0·sin v) doit être dé-référencé
+    # à une phase ~0 partout : c'est exactement le terme retiré.
+    grid = _grid()
+    wavelength_m = 0.015  # 20 GHz
+    y0 = 1.25  # aperture_center_y_m typique (D=2.2, clearance=0.15)
+    _, gv = grid.meshgrid()
+    k = 2.0 * np.pi / wavelength_m
+    m = np.sin(np.deg2rad(gv))
+    field = np.exp(1j * k * y0 * m)
+
+    dephased = dereference_phase(field, grid, wavelength_m, y0)
+
+    np.testing.assert_allclose(dephased, 0.0, atol=1e-9)
+
+
+def test_dereference_phase_constant_field_yields_inverse_carrier() -> None:
+    # Un champ constant (phase nulle partout) n'a pas de porteuse à retirer : le
+    # résultat est donc exactement la porteuse inversée -k·Y0·sin v.
+    grid = _grid()
+    wavelength_m = 0.015
+    y0 = 1.25
+    field = np.ones((grid.n_v, grid.n_u), dtype=np.complex128)
+
+    dephased = dereference_phase(field, grid, wavelength_m, y0)
+
+    _, gv = grid.meshgrid()
+    k = 2.0 * np.pi / wavelength_m
+    expected = np.angle(np.exp(-1j * k * y0 * np.sin(np.deg2rad(gv))))
+    np.testing.assert_allclose(dephased, expected, atol=1e-9)
+
+
+def test_dereference_phase_reduces_v_gradient_for_carrier_plus_slow_structure() -> None:
+    # Champ réaliste = porteuse (grande, due à Y0) + structure lente (utile,
+    # petite devant la porteuse) : après dé-référencement, le gradient de phase
+    # selon v doit être nettement plus petit qu'avant (la porteuse dominait le
+    # gradient brut et masquait la structure lente).
+    grid = _grid()
+    wavelength_m = 0.015
+    y0 = 1.25
+    _, gv = grid.meshgrid()
+    k = 2.0 * np.pi / wavelength_m
+    m = np.sin(np.deg2rad(gv))
+    slow_phase = 0.05 * gv  # gradient lent et petit devant k·y0·d(sin v)/dv
+    field = np.exp(1j * (k * y0 * m + slow_phase))
+
+    before = np.unwrap(np.angle(field), axis=0)
+    after = np.unwrap(dereference_phase(field, grid, wavelength_m, y0), axis=0)
+    grad_before = float(np.mean(np.abs(np.diff(before, axis=0))))
+    grad_after = float(np.mean(np.abs(np.diff(after, axis=0))))
+
+    assert grad_after < grad_before / 10.0
