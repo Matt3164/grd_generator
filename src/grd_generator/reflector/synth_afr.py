@@ -57,18 +57,20 @@ def dereference_phase(
 
     Un centre d'ouverture excentré en Y₀ = `aperture_center_y_m` (offset) impose au
     champ lointain une porteuse de phase quasi-linéaire en v :
-    `exp(i·k·Y₀·sin v)` (k = 2π/λ). Sur une grille d'affichage grossière, cette
-    porteuse se replie visuellement en rayures horizontales (moiré) qui masquent la
-    structure de phase utile. Cette fonction ne change PAS la physique : elle
-    retire cette porteuse *pour l'affichage seul*, en renvoyant
-    `angle(field · exp(-i·k·Y₀·sin v))`. Les champs utilisés pour le beamforming
+    `exp(-i·k·Y₀·sin v)` (k = 2π/λ ; le signe découle de la convention de TF
+    `fft2`/`ifftshift` de `farfield.far_field_fft`, noyau `exp(-i·2π·f·x)`). Sur
+    une grille d'affichage grossière, cette porteuse se replie visuellement en
+    rayures horizontales (moiré) qui masquent la structure de phase utile.
+    Cette fonction ne change PAS la physique : elle retire cette porteuse
+    *pour l'affichage seul*, en la multipliant par son conjugué et en renvoyant
+    `angle(field · exp(+i·k·Y₀·sin v))`. Les champs utilisés pour le beamforming
     (`form_beam`) et les exports GRD doivent rester les champs bruts, pas ce
     résultat.
     """
     _, gv = grid.meshgrid()
     k = 2.0 * np.pi / wavelength_m
     m = np.sin(np.deg2rad(gv))
-    carrier = np.exp(-1j * k * aperture_center_y_m * m)
+    carrier = np.exp(1j * k * aperture_center_y_m * m)
     dereferenced: FloatArray = np.angle(field * carrier)
     return dereferenced
 

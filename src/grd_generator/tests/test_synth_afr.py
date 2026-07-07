@@ -420,55 +420,91 @@ def test_footprint_truncation_at_edge_does_not_error_and_stays_nonzero() -> None
     assert np.any(np.abs(co[0]) > 0.0)
 
 
-def test_dereference_phase_removes_pure_carrier() -> None:
-    # Un champ qui N'EST QUE la porteuse exp(i·k·Y0·sin v) doit être dé-référencé
-    # à une phase ~0 partout : c'est exactement le terme retiré.
-    grid = _grid()
+def _fine_dereference_grid() -> UVGrid:
+    """Grille (u,v) fine, dédiée aux tests de `dereference_phase`.
+
+    Contrairement à `_grid()` (n=81 sur ±14°, résolution GUI), cette grille est
+    volontairement resserrée en v pour que le pas de porteuse par pixel reste
+    << π (non repliée). À basse résolution, le double de la porteuse (bug de
+    signe) se replie près de 0 par repliement de phase et masque l'erreur —
+    c'est exactement pour ça que le bug est passé inaperçu. Voir
+    `test_dereference_phase_carrier_step_is_below_alias_threshold`.
+    """
+    return UVGrid(u_min=-10.0, u_max=10.0, v_min=-2.0, v_max=2.0, n_u=161, n_v=161)
+
+
+def _carrier_step_rad_per_pixel(grid: UVGrid, wavelength_m: float, y0_m: float) -> float:
+    """Pente porteuse (rad/pixel) le long de v, pour vérifier l'absence de repliement."""
+    _, v_axis = grid.axes()
+    k = 2.0 * np.pi / wavelength_m
+    m = np.sin(np.deg2rad(v_axis))
+    carrier_phase = k * y0_m * m
+    return float(np.max(np.abs(np.diff(carrier_phase))))
+
+
+def _angular_diff(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """Écart angulaire (rad, dans [-π, π]) entre deux champs de phase."""
+    return np.angle(np.exp(1j * (a - b)))
+
+
+def test_dereference_phase_carrier_step_is_below_alias_threshold() -> None:
+    # Précondition du reste de ce module : sur `_fine_dereference_grid()`, le pas
+    # de porteuse par pixel doit rester << π, sans quoi un test qui compare des
+    # phases ne peut pas distinguer le bon signe du mauvais (repliement).
+    grid = _fine_dereference_grid()
     wavelength_m = 0.015  # 20 GHz
     y0 = 1.25  # aperture_center_y_m typique (D=2.2, clearance=0.15)
-    _, gv = grid.meshgrid()
+
+    step = _carrier_step_rad_per_pixel(grid, wavelength_m, y0)
+
+    assert step < np.pi / 4.0  # marge confortable (ici step ~0.23 rad/pixel)
+
+
+def test_dereference_phase_removes_analytic_carrier() -> None:
+    # Champ analytique = enveloppe réelle positive lisse (gaussienne en u,v) ×
+    # porteuse exp(-i·k·Y0·sin v) — c'est la convention de porteuse produite par
+    # `farfield.far_field_fft` (TF `fft2`/`ifftshift`, noyau exp(-i·2π·f·x)) pour
+    # une ouverture centrée en Y0. Après dé-référencement, il ne doit rester QUE
+    # la phase de l'enveloppe, donc ~0 partout (enveloppe réelle positive).
+    grid = _fine_dereference_grid()
+    wavelength_m = 0.015
+    y0 = 1.25
+    assert _carrier_step_rad_per_pixel(grid, wavelength_m, y0) < np.pi / 4.0
+
+    gu, gv = grid.meshgrid()
     k = 2.0 * np.pi / wavelength_m
     m = np.sin(np.deg2rad(gv))
-    field = np.exp(1j * k * y0 * m)
+    envelope = np.exp(-(gu**2 + gv**2) / (2.0 * 5.0**2))  # réelle, positive, lisse
+    field = envelope * np.exp(-1j * k * y0 * m)
 
     dephased = dereference_phase(field, grid, wavelength_m, y0)
 
     np.testing.assert_allclose(dephased, 0.0, atol=1e-9)
 
+    # Garde-fou anti-régression : avec le signe INVERSE (ancien bug, `-1j` au
+    # lieu de `+1j` dans la porteuse de `dereference_phase`), le résidu est
+    # nettement plus grand — un futur re-flip du signe casse cette assertion.
+    wrong_sign_carrier = np.exp(-1j * k * y0 * m)
+    wrong_sign_residual = np.angle(field * wrong_sign_carrier)
+    assert np.max(np.abs(wrong_sign_residual)) > 1.0
 
-def test_dereference_phase_constant_field_yields_inverse_carrier() -> None:
-    # Un champ constant (phase nulle partout) n'a pas de porteuse à retirer : le
-    # résultat est donc exactement la porteuse inversée -k·Y0·sin v.
-    grid = _grid()
+
+def test_dereference_phase_preserves_slow_phase_structure() -> None:
+    # Champ = porteuse (due à Y0, grande) + structure de phase lente (utile,
+    # petite devant la porteuse) : la dé-référence ne doit retirer QUE la
+    # porteuse linéaire et laisser intacte la structure lente.
+    grid = _fine_dereference_grid()
     wavelength_m = 0.015
     y0 = 1.25
-    field = np.ones((grid.n_v, grid.n_u), dtype=np.complex128)
+    assert _carrier_step_rad_per_pixel(grid, wavelength_m, y0) < np.pi / 4.0
+
+    gu, gv = grid.meshgrid()
+    k = 2.0 * np.pi / wavelength_m
+    m = np.sin(np.deg2rad(gv))
+    envelope = np.exp(-(gu**2 + gv**2) / (2.0 * 5.0**2))
+    slow_phase = 0.01 * gu + 0.02 * gv  # gradient lent, << pente porteuse/pixel
+    field = envelope * np.exp(1j * slow_phase) * np.exp(-1j * k * y0 * m)
 
     dephased = dereference_phase(field, grid, wavelength_m, y0)
 
-    _, gv = grid.meshgrid()
-    k = 2.0 * np.pi / wavelength_m
-    expected = np.angle(np.exp(-1j * k * y0 * np.sin(np.deg2rad(gv))))
-    np.testing.assert_allclose(dephased, expected, atol=1e-9)
-
-
-def test_dereference_phase_reduces_v_gradient_for_carrier_plus_slow_structure() -> None:
-    # Champ réaliste = porteuse (grande, due à Y0) + structure lente (utile,
-    # petite devant la porteuse) : après dé-référencement, le gradient de phase
-    # selon v doit être nettement plus petit qu'avant (la porteuse dominait le
-    # gradient brut et masquait la structure lente).
-    grid = _grid()
-    wavelength_m = 0.015
-    y0 = 1.25
-    _, gv = grid.meshgrid()
-    k = 2.0 * np.pi / wavelength_m
-    m = np.sin(np.deg2rad(gv))
-    slow_phase = 0.05 * gv  # gradient lent et petit devant k·y0·d(sin v)/dv
-    field = np.exp(1j * (k * y0 * m + slow_phase))
-
-    before = np.unwrap(np.angle(field), axis=0)
-    after = np.unwrap(dereference_phase(field, grid, wavelength_m, y0), axis=0)
-    grad_before = float(np.mean(np.abs(np.diff(before, axis=0))))
-    grad_after = float(np.mean(np.abs(np.diff(after, axis=0))))
-
-    assert grad_after < grad_before / 10.0
+    np.testing.assert_allclose(_angular_diff(dephased, slow_phase), 0.0, atol=1e-9)
