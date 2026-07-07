@@ -422,10 +422,18 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         self._cb_beam_zoom: Any = None
         self._target_uv: tuple[float, float] = (0.0, 0.0)  # cible du beam formé (deg)
         # Cache du résultat AFR zoomé (fenêtre ±2° sur la cible) : ré-synthétiser
-        # coûte ~4s (n_aperture=128 par défaut), donc uniquement si (cible,
-        # paramètres réflecteur/feeds) ont changé depuis le dernier calcul.
+        # coûte plusieurs secondes (selon la résolution ouverture n choisie), donc
+        # uniquement si (cible, paramètres réflecteur/feeds, n) ont changé depuis
+        # le dernier calcul.
         self._zoom_cache_key: tuple[Any, ...] | None = None
         self._zoom_cache_result: ReflectorResult | None = None
+        # La re-synthèse du zoom (panneau 5) est paresseuse : elle double le coût
+        # d'un generate() (synthèse à n_aperture sur une 2e grille), donc on la
+        # saute tant que l'utilisateur n'a pas cliqué de cible au moins une fois
+        # (le generate() initial de fin de __init__ affiche un placeholder à la
+        # place). Une fois activée (premier clic), elle reste active — un
+        # generate() explicite (bouton) rafraîchit alors le zoom normalement.
+        self._zoom_active = False
 
         # Paramètres réflecteur — diamètre physique réaliste par défaut (2.2 m) ;
         # avec le modèle deux échelles, l'ouverture effective par élément est
@@ -433,17 +441,20 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         # diamètre.
         self._diameter = self._dspin(0.1, 25.0, 2.2, 0.1)
         self._f_over_d = self._dspin(0.5, 4.0, 1.2, 0.1)
-        self._offset = self._dspin(0.0, 5.0, 0.0, 0.05)
+        self._offset = self._dspin(0.0, 5.0, 0.15, 0.05)
         self._freq_ghz = self._dspin(1.0, 100.0, 20.0, 1.0)
+        # Résolution de l'échantillonnage d'ouverture (n x n) : voir onglet Infos
+        # pour le compromis dx = D/n vs corrélation/empreinte.
+        self._n_aperture = self._ispin(64, 1024, 256)
         self._q = self._dspin(0.5, 20.0, 2.0, 0.5)
-        self._pitch = self._dspin(0.002, 0.5, 0.03, 0.001, decimals=3)
-        self._n_feeds = self._ispin(1, 127, 7)
+        self._pitch = self._dspin(0.002, 0.5, 0.025, 0.001, decimals=3)
+        self._n_feeds = self._ispin(1, 127, 91)
         self._defocus = self._dspin(-5.0, 5.0, 0.0, 0.1)
-        self._phase_rms = self._dspin(0.0, 3.0, 0.0, 0.05, decimals=2)
-        self._phase_shared_rms = self._dspin(0.0, 3.0, 0.0, 0.05, decimals=2)
-        self._phase_corr = self._dspin(0.005, 0.5, 0.05, 0.005, decimals=3)
-        self._footprint = self._dspin(0.0, 5.0, 0.0, 0.01, decimals=3)
-        self._footprint_mag = self._dspin(-200.0, 200.0, 0.0, 1.0, decimals=2)
+        self._phase_rms = self._dspin(0.0, 3.0, 0.30, 0.05, decimals=2)
+        self._phase_shared_rms = self._dspin(0.0, 3.0, 1.25, 0.05, decimals=2)
+        self._phase_corr = self._dspin(0.005, 0.5, 0.015, 0.005, decimals=3)
+        self._footprint = self._dspin(0.0, 5.0, 0.16, 0.01, decimals=3)
+        self._footprint_mag = self._dspin(-200.0, 200.0, 6.0, 1.0, decimals=2)
         # bornes zone : [6, 14]° conforme à ServiceZone
         self._zone_radius = self._dspin(6.0, 14.0, 8.0, 0.5)
         self._feed_idx = self._ispin(0, 0, 0)
@@ -462,6 +473,7 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         rf.addRow("F/D", self._f_over_d)
         rf.addRow("Offset clearance (m)", self._offset)
         rf.addRow("Fréquence (GHz)", self._freq_ghz)
+        rf.addRow("Résolution ouverture (n)", self._n_aperture)
         feed_grp = QGroupBox("Réseau de feeds")
         ff = QFormLayout(feed_grp)
         ff.addRow("Facteur q (cos^q)", self._q)
@@ -528,9 +540,12 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
     def generate(self) -> None:
         """Construit le résultat AFR depuis les contrôles et redessine les vues.
 
-        Curseur d'attente pendant toute la méthode : la re-synthèse du zoom
-        (`_redraw_all` → `_draw_beam`) s'ajoute au coût de la génération
-        principale et peut prendre plusieurs secondes (n_aperture=128 défaut).
+        Curseur d'attente pendant toute la méthode. Tant qu'aucune cible n'a été
+        cliquée (`_zoom_active` False), la re-synthèse du zoom (`_redraw_all` →
+        `_draw_beam`) est sautée : seule la synthèse principale coûte (~20s avec
+        91 feeds à n_aperture=256 défaut). Après un premier clic, elle s'ajoute
+        au coût de la génération et peut prendre plusieurs secondes de plus
+        (selon la résolution ouverture n).
         """
         grid = UVGrid(
             u_min=-14.0, u_max=14.0,
@@ -556,6 +571,7 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
                     phase_error_shared_rms_rad=self._phase_shared_rms.value(),
                     footprint_m=self._footprint.value(),
                     footprint_magnification=self._footprint_mag.value(),
+                    n_aperture=self._n_aperture.value(),
                 )
             except ValueError as exc:
                 QMessageBox.warning(self, "Génération impossible", str(exc))
@@ -612,13 +628,14 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
             self._footprint.value(),
             self._footprint_mag.value(),
             self._zone_radius.value(),
+            float(self._n_aperture.value()),
         )
 
     def _zoomed_beam_result(self) -> ReflectorResult:
         """Ré-synthétise les champs sur une fenêtre ±2° centrée sur la cible.
 
-        Mémorise le dernier résultat par (cible, paramètres) : ne recalcule que si
-        l'un des deux a changé depuis le dernier appel (coût ~4s à n_aperture=128).
+        Mémorise le dernier résultat par (cible, paramètres, n) : ne recalcule que si
+        l'un des trois a changé depuis le dernier appel (coût dépendant de n).
         """
         key = (self._target_uv, self._current_reflector_params())
         if key == self._zoom_cache_key and self._zoom_cache_result is not None:
@@ -645,6 +662,7 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
             phase_error_shared_rms_rad=self._phase_shared_rms.value(),
             footprint_m=self._footprint.value(),
             footprint_magnification=self._footprint_mag.value(),
+            n_aperture=self._n_aperture.value(),
         )
         self._zoom_cache_key = key
         self._zoom_cache_result = result
@@ -653,10 +671,15 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
     def _draw_beam(self, *, clear: bool = True) -> None:
         """Beam formé par filtre adapté vers `self._target_uv` (axe 4) + zoom (axe 5).
 
-        Le beam pleine ouverture a une crête ~λ/D_physique de large : sur la
-        grille large ±14°/81px elle ne fait qu'un pixel et n'est pas visible
-        (seul le plancher de speckle l'est). Le panneau 5 ré-échantillonne donc
-        les champs sur une fenêtre ±2° centrée sur la cible pour la résoudre.
+        Le beam pleine ouverture (axe 4) vient des champs déjà synthétisés : coût
+        négligeable, toujours calculé. Le beam pleine ouverture a une crête
+        ~λ/D_physique de large : sur la grille large ±14°/81px elle ne fait qu'un
+        pixel et n'est pas visible (seul le plancher de speckle l'est). Le
+        panneau 5 ré-échantillonne donc les champs sur une fenêtre ±2° centrée
+        sur la cible pour la résoudre — mais cette re-synthèse (coût ~ celui du
+        generate() principal) est paresseuse : tant qu'aucun clic n'a fixé de
+        cible (`self._zoom_active` toujours False), le panneau affiche un
+        placeholder au lieu de payer le calcul.
         """
         assert self._afr_result is not None
         r = self._afr_result
@@ -675,6 +698,14 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         self._cb_beam_dir = _draw_uv_map(self._axes[4], r.grid, dbi, title)
         draw_service_zone_uv(self._axes[4], r.zone)
         self._axes[4].plot(tu, tv, "rx", markersize=10, markeredgewidth=2)
+
+        if not self._zoom_active:
+            self._axes[5].set_axis_off()
+            self._axes[5].text(
+                0.5, 0.5, "Cliquez une cible sur une carte\npour calculer le zoom",
+                ha="center", va="center", transform=self._axes[5].transAxes,
+            )
+            return
 
         zoom = self._zoomed_beam_result()
         zoom_beam = form_beam(list(zoom.co_fields), zoom.grid, self._target_uv)
@@ -695,13 +726,16 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
     def _on_click(self, event: Any) -> None:
         """Clic sur une carte (u,v) → recale la cible et redessine le beam formé.
 
-        Curseur d'attente pendant la ré-synthèse du zoom (voir `_zoomed_beam_result`).
+        Active la re-synthèse du zoom (panneau 5) si ce n'est pas déjà fait —
+        voir `_zoom_active` — puis curseur d'attente pendant la ré-synthèse
+        (voir `_zoomed_beam_result`).
         """
         if self._afr_result is None or event.inaxes is None:
             return
         if event.xdata is None or event.ydata is None:
             return
         self._target_uv = (float(event.xdata), float(event.ydata))
+        self._zoom_active = True
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
             self._draw_beam()
@@ -821,6 +855,14 @@ faisceau <i>formé</i> vers une cible.</p>
 <tr><td><b>Fréquence (GHz)</b></td>
     <td>Fréquence d'exploitation. Longueur d'onde λ = c/f. Intervient dans la
     largeur de faisceau (λ/<i>D</i>) et le gradient de phase.</td></tr>
+<tr><td><b>Résolution ouverture (n)</b></td>
+    <td>Nombre d'échantillons par côté de la grille d'ouverture (n×n) utilisée
+    pour la FFT du champ. Fixe le pas d'échantillonnage dx = Diamètre/n : pour ne
+    pas sous-résoudre l'écran de phase (Corrélation) ni l'Empreinte, il faut
+    dx ≲ Corrélation/3 et dx ≲ Empreinte/20 — sinon le pattern paraît faussement
+    bruité (aliasing). 256 (défaut) est un compromis raisonnable (~20 s à 91
+    feeds) ; 448 donne la pleine fidélité (~80 s) ; 128 reste un aperçu rapide
+    mais sous-résout déjà une corrélation de 15 mm.</td></tr>
 <tr><td><b>Facteur q (cos^q)</b></td>
     <td>Taper d'amplitude du feed : diagramme cos<sup>q</sup>(ψ). <i>q</i> élevé ⇒
     bord du réflecteur sous-illuminé ⇒ faisceau secondaire un peu plus large et
@@ -904,8 +946,11 @@ par élément au point visé.</li>
 pixel de la grille d'affichage ±14°/81px, donc invisible dans le panneau
 directivité (axe 4), qui ne montre alors que le plancher de speckle. Le panneau
 zoom (axe 5) ré-échantillonne les champs sur une fenêtre ±2° centrée sur la
-cible pour résoudre cette crête ; mémorisé par (cible, paramètres), il ne
-recalcule (coût ~4s) que si l'un des deux change.</li>
+cible pour résoudre cette crête ; mémorisé par (cible, paramètres, résolution
+ouverture), il ne recalcule que si l'un des trois change. Cette re-synthèse est
+<i>paresseuse</i> : au démarrage (avant tout clic), le panneau affiche un
+placeholder plutôt que de payer ce calcul (coût comparable à la génération
+principale) ; le premier clic sur une carte l'active définitivement.</li>
 <li><b>Enveloppes</b> : « Enveloppe MRC (beamforming idéal) » = RSS
 10·log₁₀ Σ|Eᵢ|² (directivité max <i>atteignable</i> par recombinaison
 cohérente, lisse) ; « Enveloppe max par élément » = max des faisceaux

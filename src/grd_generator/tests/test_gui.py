@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -6,12 +7,26 @@ import pytest
 from grd_generator.gui import (
     CalibrationResult,
     ReflectorResult,
+    ReflectorStudio,
     build_reflector_result,
     build_result,
 )
 from grd_generator.schemas import UVGrid
 
 REPORTS = Path(__file__).resolve().parents[3] / "data" / "reference_reports"
+
+
+def _fast_reflector_studio(**kwargs: int) -> ReflectorStudio:
+    """Construit un ReflectorStudio sans déclencher la génération initiale de `__init__`.
+
+    Les défauts calibrés (91 feeds, résolution ouverture 256) rendent la
+    génération automatique de fin de constructeur coûteuse (~20s) ; les tests
+    qui n'ont besoin que des widgets (pas d'un résultat AFR réel) sautent cet
+    appel. Ceux qui ont besoin d'un vrai résultat réduisent `_n_feeds` puis
+    appellent `generate()` eux-mêmes.
+    """
+    with patch.object(ReflectorStudio, "generate", lambda self: None):
+        return ReflectorStudio(**kwargs)
 
 
 def test_build_result_shapes_and_mode() -> None:
@@ -133,10 +148,8 @@ def test_reflector_studio_pitch_spinbox_accepts_millimeters() -> None:
     os.environ.setdefault("MPLBACKEND", "Agg")
     from PyQt6.QtWidgets import QApplication
 
-    from grd_generator.gui import ReflectorStudio
-
     _app = QApplication.instance() or QApplication([])
-    studio = ReflectorStudio(n_u=21, n_v=21)
+    studio = _fast_reflector_studio(n_u=21, n_v=21)
     studio._pitch.setValue(0.004)
     assert studio._pitch.value() == 0.004
     studio.close()
@@ -150,14 +163,12 @@ def test_reflector_studio_phase_error_spinboxes() -> None:
     os.environ.setdefault("MPLBACKEND", "Agg")
     from PyQt6.QtWidgets import QApplication
 
-    from grd_generator.gui import ReflectorStudio
-
     _app = QApplication.instance() or QApplication([])
-    studio = ReflectorStudio(n_u=21, n_v=21)
+    studio = _fast_reflector_studio(n_u=21, n_v=21)
     assert studio._phase_rms.decimals() == 2
     assert studio._phase_rms.minimum() == pytest.approx(0.0)
     assert studio._phase_rms.maximum() == pytest.approx(3.0)
-    assert studio._phase_rms.value() == pytest.approx(0.0)
+    assert studio._phase_rms.value() == pytest.approx(0.30)
     studio._phase_rms.setValue(1.5)
     assert studio._phase_rms.value() == pytest.approx(1.5)
 
@@ -170,7 +181,7 @@ def test_reflector_studio_phase_error_spinboxes() -> None:
     assert studio._phase_shared_rms.decimals() == 2
     assert studio._phase_shared_rms.minimum() == pytest.approx(0.0)
     assert studio._phase_shared_rms.maximum() == pytest.approx(3.0)
-    assert studio._phase_shared_rms.value() == pytest.approx(0.0)
+    assert studio._phase_shared_rms.value() == pytest.approx(1.25)
     studio._phase_shared_rms.setValue(1.2)
     assert studio._phase_shared_rms.value() == pytest.approx(1.2)
     studio.close()
@@ -184,20 +195,18 @@ def test_reflector_studio_footprint_spinboxes() -> None:
     os.environ.setdefault("MPLBACKEND", "Agg")
     from PyQt6.QtWidgets import QApplication
 
-    from grd_generator.gui import ReflectorStudio
-
     _app = QApplication.instance() or QApplication([])
-    studio = ReflectorStudio(n_u=21, n_v=21)
+    studio = _fast_reflector_studio(n_u=21, n_v=21)
     assert studio._footprint.decimals() == 3
     assert studio._footprint.minimum() == pytest.approx(0.0)
     assert studio._footprint.maximum() == pytest.approx(5.0)
-    assert studio._footprint.value() == pytest.approx(0.0)
+    assert studio._footprint.value() == pytest.approx(0.16)
     studio._footprint.setValue(0.28)
     assert studio._footprint.value() == pytest.approx(0.28)
 
     assert studio._footprint_mag.minimum() == pytest.approx(-200.0)
     assert studio._footprint_mag.maximum() == pytest.approx(200.0)
-    assert studio._footprint_mag.value() == pytest.approx(0.0)
+    assert studio._footprint_mag.value() == pytest.approx(6.0)
     studio._footprint_mag.setValue(48.0)
     assert studio._footprint_mag.value() == pytest.approx(48.0)
     studio.close()
@@ -212,20 +221,23 @@ def test_reflector_studio_click_updates_target_and_zoom_panel() -> None:
     os.environ.setdefault("MPLBACKEND", "Agg")
     from PyQt6.QtWidgets import QApplication
 
-    from grd_generator.gui import ReflectorStudio
-
     _app = QApplication.instance() or QApplication([])
-    studio = ReflectorStudio(n_u=41, n_v=41)
+    studio = _fast_reflector_studio(n_u=41, n_v=41)
     studio._diameter.setValue(2.2)
     studio._n_feeds.setValue(7)
     studio.generate()
     assert len(studio._axes) == 6
+    # Avant tout clic, le zoom reste paresseux : pas de re-synthèse payée.
+    assert studio._zoom_active is False
+    assert studio._zoom_cache_key is None
+    assert studio._zoom_cache_result is None
 
     event = SimpleNamespace(inaxes=studio._axes[2], xdata=0.0, ydata=2.0)
     studio._on_click(event)
 
     assert studio._target_uv == (0.0, 2.0)
     assert len(studio._axes) == 6
+    assert studio._zoom_active is True
     assert studio._zoom_cache_key is not None
     assert studio._zoom_cache_result is not None
     studio.close()
@@ -240,10 +252,8 @@ def test_reflector_studio_click_outside_axes_is_noop() -> None:
     os.environ.setdefault("MPLBACKEND", "Agg")
     from PyQt6.QtWidgets import QApplication
 
-    from grd_generator.gui import ReflectorStudio
-
     _app = QApplication.instance() or QApplication([])
-    studio = ReflectorStudio(n_u=21, n_v=21)
+    studio = _fast_reflector_studio(n_u=21, n_v=21)
     target_before = studio._target_uv
 
     event = SimpleNamespace(inaxes=None, xdata=1.0, ydata=1.0)
