@@ -16,6 +16,7 @@ import numpy as np
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from numpy.typing import NDArray
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -56,6 +57,7 @@ from grd_generator.reflector import (
     FeedSpec,
     ReflectorSpec,
     ServiceZone,
+    dereference_phase,
     form_beam,
     hex_feed_positions,
     synthesize_reflector_fields,
@@ -70,6 +72,13 @@ from grd_generator.schemas import ComplexField, EllipticalSpec, UVGrid
 from grd_generator.synth import combined_max_directivity_dbi, elliptical_field
 
 REPORTS_DIR = Path(__file__).resolve().parents[2] / "data" / "reference_reports"
+
+# Panneau "Beam formé — zoom" (ReflectorStudio) : fenêtre ±_ZOOM_HALF_WIDTH_DEG°
+# centrée sur la cible cliquée, ré-échantillonnée à _ZOOM_N×_ZOOM_N (la crête
+# du beam pleine ouverture, ~λ/D_physique, est sous-résolue sur la grille
+# large ±14°/81px — voir docstring de `ReflectorStudio._draw_beam`).
+_ZOOM_HALF_WIDTH_DEG = 2.0
+_ZOOM_N = 81
 
 
 @dataclass(frozen=True)
@@ -138,12 +147,19 @@ def build_result(
 
 @dataclass(frozen=True)
 class ReflectorResult:
-    """Résultat AFR (pur, sans Qt) : champs co/cross par feed + zone + grille."""
+    """Résultat AFR (pur, sans Qt) : champs co/cross par feed + zone + grille.
+
+    `wavelength_m`/`aperture_center_y_m` sont dérivés du `ReflectorSpec` interne :
+    exposés ici pour l'affichage (dé-référencement de phase), pas pour les champs
+    eux-mêmes.
+    """
 
     co_fields: list[ComplexField]
     cross_fields: list[ComplexField]
     zone: ServiceZone
     grid: UVGrid
+    wavelength_m: float
+    aperture_center_y_m: float
 
 
 def build_reflector_result(
@@ -193,6 +209,8 @@ def build_reflector_result(
         cross_fields=cross,
         zone=ServiceZone(radius_deg=zone_radius_deg),
         grid=grid,
+        wavelength_m=spec.wavelength_m,
+        aperture_center_y_m=spec.aperture_center_y_m,
     )
 
 
@@ -401,8 +419,13 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         self._cb_env: Any = None
         self._cb_env_max: Any = None
         self._cb_beam_dir: Any = None
-        self._cb_beam_phase: Any = None
+        self._cb_beam_zoom: Any = None
         self._target_uv: tuple[float, float] = (0.0, 0.0)  # cible du beam formé (deg)
+        # Cache du résultat AFR zoomé (fenêtre ±2° sur la cible) : ré-synthétiser
+        # coûte ~4s (n_aperture=128 par défaut), donc uniquement si (cible,
+        # paramètres réflecteur/feeds) ont changé depuis le dernier calcul.
+        self._zoom_cache_key: tuple[Any, ...] | None = None
+        self._zoom_cache_result: ReflectorResult | None = None
 
         # Paramètres réflecteur — diamètre physique réaliste par défaut (2.2 m) ;
         # avec le modèle deux échelles, l'ouverture effective par élément est
@@ -503,42 +526,51 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         return s
 
     def generate(self) -> None:
-        """Construit le résultat AFR depuis les contrôles et redessine les vues."""
+        """Construit le résultat AFR depuis les contrôles et redessine les vues.
+
+        Curseur d'attente pendant toute la méthode : la re-synthèse du zoom
+        (`_redraw_all` → `_draw_beam`) s'ajoute au coût de la génération
+        principale et peut prendre plusieurs secondes (n_aperture=128 défaut).
+        """
         grid = UVGrid(
             u_min=-14.0, u_max=14.0,
             v_min=-14.0, v_max=14.0,
             n_u=self._n_u, n_v=self._n_v,
         )
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
-            result = build_reflector_result(
-                diameter_m=self._diameter.value(),
-                f_over_d=self._f_over_d.value(),
-                offset_clearance_m=self._offset.value(),
-                freq_ghz=self._freq_ghz.value(),
-                q=self._q.value(),
-                pitch_m=self._pitch.value(),
-                n_feeds=self._n_feeds.value(),
-                zone_radius_deg=self._zone_radius.value(),
-                grid=grid,
-                defocus_m=self._defocus.value(),
-                phase_error_rms_rad=self._phase_rms.value(),
-                phase_corr_length_m=self._phase_corr.value(),
-                phase_error_shared_rms_rad=self._phase_shared_rms.value(),
-                footprint_m=self._footprint.value(),
-                footprint_magnification=self._footprint_mag.value(),
-            )
-        except ValueError as exc:
-            QMessageBox.warning(self, "Génération impossible", str(exc))
-            return
-        self._afr_result = result
-        n = len(result.co_fields)
-        self._feed_idx.blockSignals(True)
-        self._feed_idx.setRange(0, n - 1)
-        if self._feed_idx.value() > n - 1:
-            self._feed_idx.setValue(0)
-        self._feed_idx.blockSignals(False)
-        self._redraw_all()
-        logger.info("afr_generated", n_feeds=n)
+            try:
+                result = build_reflector_result(
+                    diameter_m=self._diameter.value(),
+                    f_over_d=self._f_over_d.value(),
+                    offset_clearance_m=self._offset.value(),
+                    freq_ghz=self._freq_ghz.value(),
+                    q=self._q.value(),
+                    pitch_m=self._pitch.value(),
+                    n_feeds=self._n_feeds.value(),
+                    zone_radius_deg=self._zone_radius.value(),
+                    grid=grid,
+                    defocus_m=self._defocus.value(),
+                    phase_error_rms_rad=self._phase_rms.value(),
+                    phase_corr_length_m=self._phase_corr.value(),
+                    phase_error_shared_rms_rad=self._phase_shared_rms.value(),
+                    footprint_m=self._footprint.value(),
+                    footprint_magnification=self._footprint_mag.value(),
+                )
+            except ValueError as exc:
+                QMessageBox.warning(self, "Génération impossible", str(exc))
+                return
+            self._afr_result = result
+            n = len(result.co_fields)
+            self._feed_idx.blockSignals(True)
+            self._feed_idx.setRange(0, n - 1)
+            if self._feed_idx.value() > n - 1:
+                self._feed_idx.setValue(0)
+            self._feed_idx.blockSignals(False)
+            self._redraw_all()
+            logger.info("afr_generated", n_feeds=n)
+        finally:
+            QApplication.restoreOverrideCursor()
 
     def _redraw_all(self) -> None:
         assert self._afr_result is not None
@@ -548,23 +580,84 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         self._cb_dir = None
         self._cb_phase = None
         self._cb_beam_dir = None
-        self._cb_beam_phase = None
+        self._cb_beam_zoom = None
         self._draw_feed(self._feed_idx.value(), clear=False)
-        # Enveloppe co-pol (combinaison cohérente) sur les axes (u,v)
+        # Enveloppe MRC (combinaison cohérente, beamforming idéal) sur les axes (u,v)
         env = combined_max_directivity_dbi(list(r.co_fields))
-        self._cb_env = _draw_uv_map(self._axes[2], r.grid, env, "Enveloppe co-pol")
+        self._cb_env = _draw_uv_map(self._axes[2], r.grid, env, "Enveloppe MRC (beamforming idéal)")
         draw_service_zone_uv(self._axes[2], r.zone)
-        # Enveloppe simple max sur les axes (u,v)
+        # Enveloppe max par élément (festonnage réel, pas de recombinaison) sur les axes (u,v)
         env_max = envelope_max_dbi(np.stack(r.co_fields))
-        self._cb_env_max = _draw_uv_map(self._axes[3], r.grid, env_max, "Enveloppe max co-pol")
+        self._cb_env_max = _draw_uv_map(self._axes[3], r.grid, env_max, "Enveloppe max par élément")
         draw_service_zone_uv(self._axes[3], r.zone)
         # Beam formé vers la cible (filtre adapté) : directivité + phase
         self._draw_beam(clear=False)
         self._figure.tight_layout()
         self._canvas.draw_idle()  # type: ignore[no-untyped-call]
 
+    def _current_reflector_params(self) -> tuple[float, ...]:
+        """Paramètres réflecteur/feeds courants (hors cible) : clé de cache du zoom."""
+        return (
+            self._diameter.value(),
+            self._f_over_d.value(),
+            self._offset.value(),
+            self._freq_ghz.value(),
+            self._q.value(),
+            self._pitch.value(),
+            float(self._n_feeds.value()),
+            self._defocus.value(),
+            self._phase_rms.value(),
+            self._phase_shared_rms.value(),
+            self._phase_corr.value(),
+            self._footprint.value(),
+            self._footprint_mag.value(),
+            self._zone_radius.value(),
+        )
+
+    def _zoomed_beam_result(self) -> ReflectorResult:
+        """Ré-synthétise les champs sur une fenêtre ±2° centrée sur la cible.
+
+        Mémorise le dernier résultat par (cible, paramètres) : ne recalcule que si
+        l'un des deux a changé depuis le dernier appel (coût ~4s à n_aperture=128).
+        """
+        key = (self._target_uv, self._current_reflector_params())
+        if key == self._zoom_cache_key and self._zoom_cache_result is not None:
+            return self._zoom_cache_result
+        tu, tv = self._target_uv
+        zoom_grid = UVGrid(
+            u_min=tu - _ZOOM_HALF_WIDTH_DEG, u_max=tu + _ZOOM_HALF_WIDTH_DEG,
+            v_min=tv - _ZOOM_HALF_WIDTH_DEG, v_max=tv + _ZOOM_HALF_WIDTH_DEG,
+            n_u=_ZOOM_N, n_v=_ZOOM_N,
+        )
+        result = build_reflector_result(
+            diameter_m=self._diameter.value(),
+            f_over_d=self._f_over_d.value(),
+            offset_clearance_m=self._offset.value(),
+            freq_ghz=self._freq_ghz.value(),
+            q=self._q.value(),
+            pitch_m=self._pitch.value(),
+            n_feeds=self._n_feeds.value(),
+            zone_radius_deg=self._zone_radius.value(),
+            grid=zoom_grid,
+            defocus_m=self._defocus.value(),
+            phase_error_rms_rad=self._phase_rms.value(),
+            phase_corr_length_m=self._phase_corr.value(),
+            phase_error_shared_rms_rad=self._phase_shared_rms.value(),
+            footprint_m=self._footprint.value(),
+            footprint_magnification=self._footprint_mag.value(),
+        )
+        self._zoom_cache_key = key
+        self._zoom_cache_result = result
+        return result
+
     def _draw_beam(self, *, clear: bool = True) -> None:
-        """Beam formé par filtre adapté vers `self._target_uv` : dBi + phase (axes 4,5)."""
+        """Beam formé par filtre adapté vers `self._target_uv` (axe 4) + zoom (axe 5).
+
+        Le beam pleine ouverture a une crête ~λ/D_physique de large : sur la
+        grille large ±14°/81px elle ne fait qu'un pixel et n'est pas visible
+        (seul le plancher de speckle l'est). Le panneau 5 ré-échantillonne donc
+        les champs sur une fenêtre ±2° centrée sur la cible pour la résoudre.
+        """
         assert self._afr_result is not None
         r = self._afr_result
         beam = form_beam(list(r.co_fields), r.grid, self._target_uv)
@@ -572,8 +665,8 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         if clear:
             if self._cb_beam_dir is not None:
                 self._cb_beam_dir.remove()
-            if self._cb_beam_phase is not None:
-                self._cb_beam_phase.remove()
+            if self._cb_beam_zoom is not None:
+                self._cb_beam_zoom.remove()
             self._axes[4].clear()
             self._axes[5].clear()
         tu, tv = self._target_uv
@@ -581,19 +674,39 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         title = f"Beam formé ({tu:.1f}, {tv:.1f})° — crête {peak_dbi:.1f} dBi"
         self._cb_beam_dir = _draw_uv_map(self._axes[4], r.grid, dbi, title)
         draw_service_zone_uv(self._axes[4], r.zone)
-        self._cb_beam_phase = _draw_phase_map(self._axes[5], r.grid, beam, "Beam formé — phase")
-        draw_service_zone_uv(self._axes[5], r.zone)
-        for ax in (self._axes[4], self._axes[5]):
-            ax.plot(tu, tv, "rx", markersize=10, markeredgewidth=2)
+        self._axes[4].plot(tu, tv, "rx", markersize=10, markeredgewidth=2)
+
+        zoom = self._zoomed_beam_result()
+        zoom_beam = form_beam(list(zoom.co_fields), zoom.grid, self._target_uv)
+        zoom_dbi = 10.0 * np.log10(np.maximum(np.abs(zoom_beam) ** 2, 1e-12))
+        zoom_title = (
+            f"Beam formé — zoom ±{_ZOOM_HALF_WIDTH_DEG:.0f}°"
+            f" (crête {float(zoom_dbi.max()):.1f} dBi)"
+        )
+        self._cb_beam_zoom = _draw_uv_map(self._axes[5], zoom.grid, zoom_dbi, zoom_title)
+        draw_service_zone_uv(self._axes[5], zoom.zone)
+        self._axes[5].plot(tu, tv, "rx", markersize=10, markeredgewidth=2)
+        # Le cercle de zone peut être bien plus large que la fenêtre de zoom :
+        # borner explicitement la vue pour ne pas laisser matplotlib ré-élargir
+        # les axes afin de l'inclure en entier.
+        self._axes[5].set_xlim(zoom.grid.u_min, zoom.grid.u_max)
+        self._axes[5].set_ylim(zoom.grid.v_min, zoom.grid.v_max)
 
     def _on_click(self, event: Any) -> None:
-        """Clic sur une carte (u,v) → recale la cible et redessine le beam formé."""
+        """Clic sur une carte (u,v) → recale la cible et redessine le beam formé.
+
+        Curseur d'attente pendant la ré-synthèse du zoom (voir `_zoomed_beam_result`).
+        """
         if self._afr_result is None or event.inaxes is None:
             return
         if event.xdata is None or event.ydata is None:
             return
         self._target_uv = (float(event.xdata), float(event.ydata))
-        self._draw_beam()
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            self._draw_beam()
+        finally:
+            QApplication.restoreOverrideCursor()
         self._canvas.draw_idle()  # type: ignore[no-untyped-call]
 
     def _draw_feed(self, idx: int, *, clear: bool = True) -> None:
@@ -610,7 +723,15 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
             self._axes[1].clear()
         self._cb_dir = _draw_uv_map(self._axes[0], r.grid, dbi, f"Feed #{idx} — co-pol dBi")
         draw_service_zone_uv(self._axes[0], r.zone)
-        self._cb_phase = _draw_phase_map(self._axes[1], r.grid, field, f"Feed #{idx} — phase")
+        # Dé-référencement d'affichage uniquement (voir docstring `dereference_phase`) :
+        # retire la porteuse linéaire due au centre d'ouverture décalé, qui sinon se
+        # replie en rayures sur cette grille grossière. `field` (utilisé pour le
+        # beamforming/exports) n'est pas modifié.
+        dephased_angle = dereference_phase(field, r.grid, r.wavelength_m, r.aperture_center_y_m)
+        dephased_field = np.exp(1j * dephased_angle)
+        self._cb_phase = _draw_phase_map(
+            self._axes[1], r.grid, dephased_field, f"Feed #{idx} — phase (dé-référencée)"
+        )
         draw_service_zone_uv(self._axes[1], r.zone)
 
     def _on_feed_changed(self, idx: int) -> None:
@@ -759,8 +880,9 @@ faisceau <i>formé</i> vers une cible.</p>
     <td>Indice du feed dont le pattern individuel (co-pol dBi + phase) est affiché
     en haut à gauche.</td></tr>
 <tr><td><b>Cible du beam (clic)</b></td>
-    <td>Cliquer sur n'importe quelle carte (u,v) fixe la coordonnée cible (u,v)°
-    du beam formé par filtre adapté (rangée du bas).</td></tr>
+    <td>Cliquer sur n'importe quelle carte large (u,v) fixe la coordonnée cible
+    (u,v)° du beam formé par filtre adapté (rangée du bas) — directivité (axe 4)
+    et zoom (axe 5), qui suivent tous les deux le clic.</td></tr>
 </table>
 
 <h3>Détail de la simulation</h3>
@@ -775,11 +897,26 @@ en cosinus directeurs (l,m) = (sinθcosφ, sinθsinφ), puis normalisée en dire
 <li><b>Co / cross-pol</b> : décomposition de Ludwig-3 ; la cross-pol vient de la
 géométrie offset.</li>
 <li><b>Beam formé</b> : filtre adapté (conjugate beamforming), poids
-wᵢ = conj(Eᵢ(cible)) normalisés en norme L2 ⇒ la crête touche l'enveloppe co-pol
-max au point visé.</li>
-<li><b>Enveloppes</b> : « Enveloppe co-pol » = RSS 10·log₁₀ Σ|Eᵢ|² (directivité max
-<i>atteignable</i>, lisse) ; « Enveloppe max co-pol » = max des faisceaux
-individuels (montre le festonnage réel).</li>
+wᵢ = conj(Eᵢ(cible)) normalisés en norme L2 ⇒ la crête touche l'enveloppe max
+par élément au point visé.</li>
+<li><b>Beam formé — zoom</b> : la crête du beam formé pleine ouverture est large de
+~λ/D<sub>physique</sub> (ex. ~0,35° à 20 GHz/2,2 m) — souvent moins large qu'un
+pixel de la grille d'affichage ±14°/81px, donc invisible dans le panneau
+directivité (axe 4), qui ne montre alors que le plancher de speckle. Le panneau
+zoom (axe 5) ré-échantillonne les champs sur une fenêtre ±2° centrée sur la
+cible pour résoudre cette crête ; mémorisé par (cible, paramètres), il ne
+recalcule (coût ~4s) que si l'un des deux change.</li>
+<li><b>Enveloppes</b> : « Enveloppe MRC (beamforming idéal) » = RSS
+10·log₁₀ Σ|Eᵢ|² (directivité max <i>atteignable</i> par recombinaison
+cohérente, lisse) ; « Enveloppe max par élément » = max des faisceaux
+individuels sans recombinaison (montre le festonnage réel). Comparer une cible
+de gain à la seconde, pas à la première.</li>
+<li><b>Phase dé-référencée</b> : le panneau phase du feed (axe 1) retire, pour
+l'affichage seulement, la porteuse linéaire exp(i·k·Y₀·sin v) due au centre
+d'ouverture décalé Y₀ (offset clearance + D/2) — sans elle, cette porteuse se
+replie en rayures (moiré) sur la grille d'affichage grossière. Les champs
+utilisés pour le beamforming et les exports GRD restent inchangés (vérité
+physique).</li>
 </ul>
 
 <h3>Exports</h3>

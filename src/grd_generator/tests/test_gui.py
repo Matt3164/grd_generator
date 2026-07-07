@@ -201,3 +201,53 @@ def test_reflector_studio_footprint_spinboxes() -> None:
     studio._footprint_mag.setValue(48.0)
     assert studio._footprint_mag.value() == pytest.approx(48.0)
     studio.close()
+
+
+def test_reflector_studio_click_updates_target_and_zoom_panel() -> None:
+    """Un clic sur une carte large recale la cible et alimente le panneau zoom (axe 5)."""
+    import os
+    from types import SimpleNamespace
+
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    os.environ.setdefault("MPLBACKEND", "Agg")
+    from PyQt6.QtWidgets import QApplication
+
+    from grd_generator.gui import ReflectorStudio
+
+    _app = QApplication.instance() or QApplication([])
+    studio = ReflectorStudio(n_u=41, n_v=41)
+    studio._diameter.setValue(2.2)
+    studio._n_feeds.setValue(7)
+    studio.generate()
+    assert len(studio._axes) == 6
+
+    event = SimpleNamespace(inaxes=studio._axes[2], xdata=0.0, ydata=2.0)
+    studio._on_click(event)
+
+    assert studio._target_uv == (0.0, 2.0)
+    assert len(studio._axes) == 6
+    assert studio._zoom_cache_key is not None
+    assert studio._zoom_cache_result is not None
+    studio.close()
+
+
+def test_reflector_studio_click_outside_axes_is_noop() -> None:
+    """Un événement hors des axes (inaxes=None) ne modifie pas la cible ni ne lève."""
+    import os
+    from types import SimpleNamespace
+
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    os.environ.setdefault("MPLBACKEND", "Agg")
+    from PyQt6.QtWidgets import QApplication
+
+    from grd_generator.gui import ReflectorStudio
+
+    _app = QApplication.instance() or QApplication([])
+    studio = ReflectorStudio(n_u=21, n_v=21)
+    target_before = studio._target_uv
+
+    event = SimpleNamespace(inaxes=None, xdata=1.0, ydata=1.0)
+    studio._on_click(event)
+
+    assert studio._target_uv == target_before
+    studio.close()

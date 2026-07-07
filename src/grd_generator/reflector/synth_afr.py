@@ -1,11 +1,14 @@
 """Assemblage AFR : feeds → champs secondaires complexes (co + cross) sur (u,v)."""
 
 import numpy as np
+from numpy.typing import NDArray
 
 from grd_generator.reflector import farfield, optics
 from grd_generator.reflector.spec import FeedSpec, ReflectorSpec
 from grd_generator.schemas import ComplexField, UVGrid
 from grd_generator.synth import hex_centers_uv
+
+FloatArray = NDArray[np.float64]
 
 # Décalage de seed pour l'écran de phase COMMUN (`phase_error_shared_rms_rad`),
 # ajouté à `phase_error_seed` plutôt que soustrait : `np.random.default_rng`
@@ -45,6 +48,29 @@ def form_beam(
     weights = np.conj(samples) / norm
     beam: ComplexField = np.tensordot(weights, stack, axes=([0], [0])).astype(np.complex128)
     return beam
+
+
+def dereference_phase(
+    field: ComplexField, grid: UVGrid, wavelength_m: float, aperture_center_y_m: float
+) -> FloatArray:
+    """Phase de `field` dé-référencée de la porteuse due au centre d'ouverture décalé.
+
+    Un centre d'ouverture excentré en Y₀ = `aperture_center_y_m` (offset) impose au
+    champ lointain une porteuse de phase quasi-linéaire en v :
+    `exp(i·k·Y₀·sin v)` (k = 2π/λ). Sur une grille d'affichage grossière, cette
+    porteuse se replie visuellement en rayures horizontales (moiré) qui masquent la
+    structure de phase utile. Cette fonction ne change PAS la physique : elle
+    retire cette porteuse *pour l'affichage seul*, en renvoyant
+    `angle(field · exp(-i·k·Y₀·sin v))`. Les champs utilisés pour le beamforming
+    (`form_beam`) et les exports GRD doivent rester les champs bruts, pas ce
+    résultat.
+    """
+    _, gv = grid.meshgrid()
+    k = 2.0 * np.pi / wavelength_m
+    m = np.sin(np.deg2rad(gv))
+    carrier = np.exp(-1j * k * aperture_center_y_m * m)
+    dereferenced: FloatArray = np.angle(field * carrier)
+    return dereferenced
 
 
 def synthesize_reflector_fields(
