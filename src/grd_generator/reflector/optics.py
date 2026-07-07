@@ -38,6 +38,22 @@ défocalisé est repositionné/repointé pour recentrer la couverture).
 disque d'ouverture, le plan a + b·X + c·Y ajusté à `k·δz·(1 − cosψ)` avant de
 l'ajouter à la phase ; le résidu ne contient plus que l'étalement symétrique
 recherché.
+
+Écran de phase aléatoire corrélé (erreurs type Ruze) : `random_phase_screen`
+modélise les erreurs de surface/alignement statistiques d'un feed par un
+champ de phase aléatoire mais spatialement corrélé sur l'ouverture. Le champ
+brut est un bruit blanc gaussien N(0,1) échantillonné sur la grille complète
+(RNG dédié, un par feed) ; il est lissé par un filtre passe-bas gaussien de
+longueur caractéristique `corr_length_m`, réalisé en numpy pur par
+convolution dans le domaine spectral (`np.fft.rfft2`/`irfft2`, sans
+dépendance scipy) — le pas physique `dx` de la grille convertit cette
+longueur en pixels. Le résultat est recentré (moyenne nulle sur `inside`)
+puis renormalisé pour que son écart-type sur `inside` vaille exactement
+`rms_rad` (radians). Contrairement au defocus, aucune composante plane n'est
+retirée : l'errance de pointage aléatoire par feed qu'introduit le bruit
+basse fréquence est un effet recherché, qui reproduit la dispersion des
+centres de faisceau observée sur données réelles (le pitch, lui, ne pilote
+que l'espacement nominal des faisceaux).
 """
 
 import numpy as np
@@ -89,6 +105,48 @@ def _fit_plane(
     return plane
 
 
+def random_phase_screen(
+    X: FloatArray,
+    Y: FloatArray,
+    inside: NDArray[np.bool_],
+    dx: float,
+    rms_rad: float,
+    corr_length_m: float,
+    rng: np.random.Generator,
+) -> FloatArray:
+    """Écran de phase aléatoire corrélé (erreurs type Ruze) sur la grille d'ouverture.
+
+    Bruit blanc gaussien N(0,1) (`rng`, dédié à l'appelant) sur la grille
+    complète, lissé par un filtre passe-bas gaussien de longueur
+    caractéristique `corr_length_m` (m) — convolution réalisée dans le
+    domaine spectral (FFT 2D réelle, noyau gaussien périodique construit
+    dans le domaine spatial), numpy pur, sans dépendance scipy. `dx` (m) est
+    le pas physique de la grille, nécessaire pour convertir `corr_length_m`
+    en écart-type du noyau exprimé en pixels.
+
+    La moyenne sur `inside` est retirée puis le champ est renormalisé pour
+    que son écart-type sur `inside` vaille exactement `rms_rad` (radians).
+    Aucune composante plane n'est retirée (contrairement à `defocus_m`) :
+    l'errance de pointage aléatoire par feed que cela introduit est un effet
+    recherché (voir docstring du module).
+    """
+    noise = rng.standard_normal(X.shape)
+    n_y, n_x = X.shape
+    sigma_px = corr_length_m / dx
+    iy = (np.arange(n_y) + n_y // 2) % n_y - n_y // 2
+    ix = (np.arange(n_x) + n_x // 2) % n_x - n_x // 2
+    grid_ix, grid_iy = np.meshgrid(ix, iy)
+    kernel = np.exp(-(grid_ix**2 + grid_iy**2) / (2.0 * sigma_px**2))
+    kernel /= kernel.sum()
+    smoothed: FloatArray = np.fft.irfft2(
+        np.fft.rfft2(noise) * np.fft.rfft2(kernel), s=X.shape
+    )
+    centered = smoothed - smoothed[inside].mean()
+    std_inside = centered[inside].std()
+    screen: FloatArray = centered * (rms_rad / std_inside)
+    return screen
+
+
 def aperture_field(
     spec: ReflectorSpec,
     feed_xy: tuple[float, float],
@@ -97,6 +155,7 @@ def aperture_field(
     inside: NDArray[np.bool_],
     q: float,
     defocus_m: float = 0.0,
+    extra_phase: FloatArray | None = None,
 ) -> ComplexArray:
     """Champ scalaire d'ouverture pour un feed : taper cos^q(ψ) + tilt + defocus.
 
@@ -111,6 +170,12 @@ def aperture_field(
     reste du plan ne coûte rien.
     Avec `defocus_m=0.0`, le champ est strictement inchangé (early-out : pas
     de résolution moindres carrés à payer).
+
+    `extra_phase`, si fourni, est simplement ajouté à la phase totale (tilt +
+    defocus) avant l'exponentielle complexe — typiquement l'écran de phase
+    aléatoire construit par l'appelant via `random_phase_screen` (l'appelant
+    porte le contexte par-feed : RNG seedé, paramètres). Avec
+    `extra_phase=None`, le champ est strictement inchangé.
     """
     psi = illumination_angle(X, Y, spec.focal_length_m)
     amp = np.cos(psi) ** q
@@ -122,9 +187,10 @@ def aperture_field(
     else:
         raw_defocus_phase = k * defocus_m * (1.0 - np.cos(psi))
         defocus_phase = raw_defocus_phase - _fit_plane(X, Y, raw_defocus_phase, inside)
-    field: ComplexArray = (inside * amp * np.exp(1j * (tilt + defocus_phase))).astype(
-        np.complex128
-    )
+    total_phase = tilt + defocus_phase
+    if extra_phase is not None:
+        total_phase = total_phase + extra_phase
+    field: ComplexArray = (inside * amp * np.exp(1j * total_phase)).astype(np.complex128)
     return field
 
 

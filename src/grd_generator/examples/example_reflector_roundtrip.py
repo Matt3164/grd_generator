@@ -75,6 +75,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--pitch-m", type=float, default=0.03)
     parser.add_argument("--n-feeds", type=int, default=7)
     parser.add_argument("--defocus-m", type=float, default=0.0)
+    parser.add_argument("--phase-rms-rad", type=float, default=0.0)
+    parser.add_argument("--phase-corr-m", type=float, default=0.05)
+    parser.add_argument("--phase-seed", type=int, default=0)
+    parser.add_argument("--phase-shared-rms-rad", type=float, default=0.0)
     parser.add_argument("--zone-radius-deg", type=float, default=8.0)
     parser.add_argument("--n-grid", type=int, default=81)
     parser.add_argument(
@@ -114,6 +118,10 @@ def generate_and_export_grd(args: argparse.Namespace, grd_dir: Path) -> int:
         zone_radius_deg=args.zone_radius_deg,
         grid=grid,
         defocus_m=args.defocus_m,
+        phase_error_rms_rad=args.phase_rms_rad,
+        phase_corr_length_m=args.phase_corr_m,
+        phase_error_seed=args.phase_seed,
+        phase_error_shared_rms_rad=args.phase_shared_rms_rad,
     )
     grd_dir.mkdir(parents=True, exist_ok=True)
     freq_hz = args.freq_ghz * 1e9

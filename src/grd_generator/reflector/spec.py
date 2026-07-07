@@ -36,6 +36,18 @@ class FeedSpec(BaseModel):
     # Déplacement axial du plan des feeds (m), le long de l'axe focal
     # (>0 = feed reculé, éloigné du réflecteur). Pas de contrainte de signe.
     defocus_m: float = Field(0.0)
+    # Écran de phase aléatoire corrélé par feed (erreurs type Ruze), voir
+    # `optics.random_phase_screen`. rms=0 -> pas d'écran (comportement inchangé).
+    phase_error_rms_rad: float = Field(0.0, ge=0.0)
+    phase_corr_length_m: float = Field(0.05, gt=0.0)
+    phase_error_seed: int = Field(0)
+    # Écran de phase aléatoire corrélé COMMUN à tous les feeds (erreurs de
+    # surface du réflecteur, par opposition aux erreurs propres au feed
+    # ci-dessus) : même longueur de corrélation `phase_corr_length_m`,
+    # construit une seule fois (voir `synth_afr._SHARED_SEED_OFFSET` pour le
+    # RNG dédié, distinct de tous les seeds par-feed `phase_error_seed + i`,
+    # i >= 0) et ajouté à l'écran de chaque feed. rms=0 -> pas d'écran commun.
+    phase_error_shared_rms_rad: float = Field(0.0, ge=0.0)
 
     @property
     def n_feeds(self) -> int:

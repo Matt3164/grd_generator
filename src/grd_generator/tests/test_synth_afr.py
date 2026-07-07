@@ -109,3 +109,165 @@ def test_axial_defocus_offset_aperture_does_not_squint() -> None:
 
     # L'étalement demeure : la crête baisse toujours avec le defocus.
     assert peak_defocused < peak_focused
+
+
+def test_phase_error_rms_zero_leaves_fields_unchanged() -> None:
+    # rms=0 (défaut) : le champ doit être strictement identique à l'existant,
+    # que phase_error_rms_rad soit omis ou explicitement à 0.
+    spec = ReflectorSpec(diameter_m=2.0, focal_length_m=2.0, freq_hz=20e9)
+    grid = _grid()
+    feeds_default = FeedSpec(positions_m=[(0.0, 0.0)], q=2.0)
+    feeds_explicit_zero = FeedSpec(positions_m=[(0.0, 0.0)], q=2.0, phase_error_rms_rad=0.0)
+    co_default, cross_default = synthesize_reflector_fields(
+        spec, feeds_default, grid, n_aperture=64, pad_factor=4
+    )
+    co_zero, cross_zero = synthesize_reflector_fields(
+        spec, feeds_explicit_zero, grid, n_aperture=64, pad_factor=4
+    )
+    np.testing.assert_array_equal(co_default[0], co_zero[0])
+    np.testing.assert_array_equal(cross_default[0], cross_zero[0])
+
+
+def test_phase_error_is_deterministic_given_same_spec_and_seed() -> None:
+    spec = ReflectorSpec(diameter_m=2.0, focal_length_m=2.0, freq_hz=20e9)
+    grid = _grid()
+    feeds = FeedSpec(
+        positions_m=[(0.0, 0.0)],
+        q=2.0,
+        phase_error_rms_rad=0.5,
+        phase_corr_length_m=0.05,
+        phase_error_seed=3,
+    )
+    co_a, _ = synthesize_reflector_fields(spec, feeds, grid, n_aperture=64, pad_factor=4)
+    co_b, _ = synthesize_reflector_fields(spec, feeds, grid, n_aperture=64, pad_factor=4)
+    np.testing.assert_array_equal(co_a[0], co_b[0])
+
+
+def test_phase_error_differs_between_feeds() -> None:
+    # Deux feeds différents doivent recevoir des écrans de phase différents
+    # (RNG seedé par index de feed) : les champs par feed ne peuvent donc pas
+    # être identiques au-delà du tilt commun (positions de feed différentes,
+    # donc le tilt diffère déjà, mais on vérifie surtout que l'ajout d'un
+    # bruit indépendant n'est pas trivialement partagé).
+    spec = ReflectorSpec(diameter_m=2.0, focal_length_m=2.0, freq_hz=20e9)
+    grid = _grid()
+    feeds = FeedSpec(
+        positions_m=[(0.0, 0.0), (0.0, 0.0)],  # même position -> seul le bruit diffère
+        q=2.0,
+        phase_error_rms_rad=0.5,
+        phase_corr_length_m=0.05,
+        phase_error_seed=0,
+    )
+    co, _ = synthesize_reflector_fields(spec, feeds, grid, n_aperture=64, pad_factor=4)
+    assert not np.allclose(co[0], co[1])
+
+
+def test_phase_error_lowers_peak_and_raises_sidelobe_floor() -> None:
+    # D=0.28m, F/D=1.2, clearance=0.15m, 20 GHz, feed central : avec un bruit
+    # de phase de rms ~1 rad et une corrélation courte (D/10), la crête doit
+    # baisser nettement et le niveau max hors lobe principal (au-delà de deux
+    # largeurs de lobe environ) doit remonter nettement (voir tâche).
+    spec = ReflectorSpec(
+        diameter_m=0.28, focal_length_m=0.336, offset_clearance_m=0.15, freq_hz=20e9
+    )
+    grid = UVGrid(u_min=-30, u_max=30, v_min=-30, v_max=30, n_u=121, n_v=121)
+    gu, gv = grid.meshgrid()
+
+    feeds_clean = FeedSpec(positions_m=[(0.0, 0.0)], q=2.0)
+    co_clean, _ = synthesize_reflector_fields(spec, feeds_clean, grid, n_aperture=64, pad_factor=4)
+    dbi_clean = 10.0 * np.log10(np.maximum(np.abs(co_clean[0]) ** 2, 1e-12))
+    peak_clean = float(dbi_clean.max())
+
+    feeds_noisy = FeedSpec(
+        positions_m=[(0.0, 0.0)],
+        q=2.0,
+        phase_error_rms_rad=1.0,
+        phase_corr_length_m=spec.diameter_m / 10.0,
+        phase_error_seed=0,
+    )
+    co_noisy, _ = synthesize_reflector_fields(spec, feeds_noisy, grid, n_aperture=64, pad_factor=4)
+    dbi_noisy = 10.0 * np.log10(np.maximum(np.abs(co_noisy[0]) ** 2, 1e-12))
+    peak_noisy = float(dbi_noisy.max())
+
+    assert peak_noisy < peak_clean - 2.0
+
+    # Masque "hors lobe principal" : au-delà d'environ 2 largeurs de lobe
+    # (approx. λ/D en degrés) du pointage nominal (0,0).
+    lobe_width_deg = np.degrees(spec.wavelength_m / spec.diameter_m)
+    outside_mask = np.hypot(gu, gv) > 2.0 * lobe_width_deg
+    floor_clean = float(dbi_clean[outside_mask].max())
+    floor_noisy = float(dbi_noisy[outside_mask].max())
+    assert floor_noisy > floor_clean + 5.0
+
+
+def test_shared_phase_error_zero_leaves_fields_unchanged() -> None:
+    # phase_error_shared_rms_rad=0 (défaut) : le champ doit être strictement
+    # identique à l'existant, écran par-feed actif ou non.
+    spec = ReflectorSpec(diameter_m=2.0, focal_length_m=2.0, freq_hz=20e9)
+    grid = _grid()
+    feeds_no_shared = FeedSpec(positions_m=[(0.0, 0.0)], q=2.0, phase_error_rms_rad=0.4)
+    feeds_explicit_zero_shared = FeedSpec(
+        positions_m=[(0.0, 0.0)],
+        q=2.0,
+        phase_error_rms_rad=0.4,
+        phase_error_shared_rms_rad=0.0,
+    )
+    co_a, cross_a = synthesize_reflector_fields(
+        spec, feeds_no_shared, grid, n_aperture=64, pad_factor=4
+    )
+    co_b, cross_b = synthesize_reflector_fields(
+        spec, feeds_explicit_zero_shared, grid, n_aperture=64, pad_factor=4
+    )
+    np.testing.assert_array_equal(co_a[0], co_b[0])
+    np.testing.assert_array_equal(cross_a[0], cross_b[0])
+
+
+def test_shared_and_individual_phase_error_combine_and_differ_from_each_alone() -> None:
+    # Le cumul (shared + individuel) doit différer de chacun pris seul : le
+    # champ résultant n'est ni celui de l'écran individuel seul, ni celui de
+    # l'écran commun seul.
+    spec = ReflectorSpec(diameter_m=2.0, focal_length_m=2.0, freq_hz=20e9)
+    grid = _grid()
+
+    feeds_individual_only = FeedSpec(
+        positions_m=[(0.0, 0.0)], q=2.0, phase_error_rms_rad=0.4, phase_error_seed=0
+    )
+    feeds_shared_only = FeedSpec(
+        positions_m=[(0.0, 0.0)], q=2.0, phase_error_shared_rms_rad=0.4, phase_error_seed=0
+    )
+    feeds_both = FeedSpec(
+        positions_m=[(0.0, 0.0)],
+        q=2.0,
+        phase_error_rms_rad=0.4,
+        phase_error_shared_rms_rad=0.4,
+        phase_error_seed=0,
+    )
+
+    co_individual, _ = synthesize_reflector_fields(
+        spec, feeds_individual_only, grid, n_aperture=64, pad_factor=4
+    )
+    co_shared, _ = synthesize_reflector_fields(
+        spec, feeds_shared_only, grid, n_aperture=64, pad_factor=4
+    )
+    co_both, _ = synthesize_reflector_fields(spec, feeds_both, grid, n_aperture=64, pad_factor=4)
+
+    assert not np.allclose(co_both[0], co_individual[0])
+    assert not np.allclose(co_both[0], co_shared[0])
+
+
+def test_shared_phase_error_is_deterministic_given_same_spec_and_seed() -> None:
+    spec = ReflectorSpec(diameter_m=2.0, focal_length_m=2.0, freq_hz=20e9)
+    grid = _grid()
+    feeds = FeedSpec(
+        positions_m=[(0.0, 0.0), (0.01, 0.0)],
+        q=2.0,
+        phase_error_rms_rad=0.3,
+        phase_error_shared_rms_rad=0.6,
+        phase_corr_length_m=0.04,
+        phase_error_seed=5,
+    )
+    co_a, cross_a = synthesize_reflector_fields(spec, feeds, grid, n_aperture=64, pad_factor=4)
+    co_b, cross_b = synthesize_reflector_fields(spec, feeds, grid, n_aperture=64, pad_factor=4)
+    for i in range(2):
+        np.testing.assert_array_equal(co_a[i], co_b[i])
+        np.testing.assert_array_equal(cross_a[i], cross_b[i])

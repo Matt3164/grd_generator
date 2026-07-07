@@ -109,3 +109,102 @@ def test_aperture_field_defocus_sign_flips_extra_phase() -> None:
     extra_phase_pos = np.angle(field_pos[inside] / field_nodefocus[inside])
     extra_phase_neg = np.angle(field_neg[inside] / field_nodefocus[inside])
     np.testing.assert_allclose(extra_phase_pos, -extra_phase_neg, atol=1e-9)
+
+
+def test_aperture_field_extra_phase_none_is_identical_to_default() -> None:
+    spec = _spec()
+    X, Y, inside, dx = optics.aperture_grid(spec, n_aperture=32, pad_factor=2)
+    field_default = optics.aperture_field(spec, (0.01, 0.0), X, Y, inside, q=2.0)
+    field_explicit_none = optics.aperture_field(
+        spec, (0.01, 0.0), X, Y, inside, q=2.0, extra_phase=None
+    )
+    np.testing.assert_array_equal(field_default, field_explicit_none)
+
+
+def test_aperture_field_extra_phase_is_added_to_total_phase() -> None:
+    spec = _spec()
+    X, Y, inside, dx = optics.aperture_grid(spec, n_aperture=32, pad_factor=2)
+    feed_xy = (0.01, -0.005)
+    field_base = optics.aperture_field(spec, feed_xy, X, Y, inside, q=2.0, defocus_m=0.1)
+    extra_phase = 0.3 * np.sin(X) + 0.2 * np.cos(Y)
+    field_extra = optics.aperture_field(
+        spec, feed_xy, X, Y, inside, q=2.0, defocus_m=0.1, extra_phase=extra_phase
+    )
+    observed_extra = np.angle(field_extra[inside] / field_base[inside])
+    expected_extra = np.angle(np.exp(1j * extra_phase[inside]))
+    np.testing.assert_allclose(observed_extra, expected_extra, atol=1e-9)
+
+
+def test_random_phase_screen_matches_requested_rms_and_zero_mean() -> None:
+    spec = _spec()
+    X, Y, inside, dx = optics.aperture_grid(spec, n_aperture=64, pad_factor=2)
+    rng = np.random.default_rng(0)
+    rms_rad = 0.7
+    screen = optics.random_phase_screen(
+        X, Y, inside, dx, rms_rad=rms_rad, corr_length_m=0.05, rng=rng
+    )
+    assert screen[inside].mean() == pytest.approx(0.0, abs=1e-9)
+    assert screen[inside].std() == pytest.approx(rms_rad, rel=0.01)
+
+
+def test_random_phase_screen_smoothing_reduces_gradient_energy() -> None:
+    # Un noyau de lissage 4x plus large doit produire un champ nettement plus
+    # lisse : l'énergie de gradient (somme des diffs au carré) sur `inside`
+    # doit être nettement plus faible.
+    spec = _spec()
+    X, Y, inside, dx = optics.aperture_grid(spec, n_aperture=64, pad_factor=2)
+
+    def _gradient_energy(screen: np.ndarray) -> float:
+        dgx = np.diff(screen, axis=1)
+        dgy = np.diff(screen, axis=0)
+        mask_x = inside[:, :-1] & inside[:, 1:]
+        mask_y = inside[:-1, :] & inside[1:, :]
+        return float(np.sum(dgx[mask_x] ** 2) + np.sum(dgy[mask_y] ** 2))
+
+    screen_short = optics.random_phase_screen(
+        X, Y, inside, dx, rms_rad=1.0, corr_length_m=0.01, rng=np.random.default_rng(1)
+    )
+    screen_long = optics.random_phase_screen(
+        X, Y, inside, dx, rms_rad=1.0, corr_length_m=0.04, rng=np.random.default_rng(1)
+    )
+    energy_short = _gradient_energy(screen_short)
+    energy_long = _gradient_energy(screen_long)
+    assert energy_long < energy_short * 0.5
+
+
+def test_random_phase_screen_reproducible_with_same_rng_seed() -> None:
+    spec = _spec()
+    X, Y, inside, dx = optics.aperture_grid(spec, n_aperture=32, pad_factor=2)
+    screen_a = optics.random_phase_screen(
+        X, Y, inside, dx, rms_rad=0.5, corr_length_m=0.03, rng=np.random.default_rng(7)
+    )
+    screen_b = optics.random_phase_screen(
+        X, Y, inside, dx, rms_rad=0.5, corr_length_m=0.03, rng=np.random.default_rng(7)
+    )
+    np.testing.assert_array_equal(screen_a, screen_b)
+
+
+def test_shared_extra_phase_ratio_identical_across_feeds() -> None:
+    # Un écran de phase COMMUN (même array `extra_phase`) appliqué à deux
+    # feeds différents doit produire, dans le domaine d'ouverture, le même
+    # facteur multiplicatif complexe exp(i*screen) : le ratio
+    # champ_avec_écran/champ_sans_écran ne dépend que de l'écran, pas du feed
+    # (tilt et taper d'amplitude s'annulent dans le ratio).
+    spec = _spec()
+    X, Y, inside, dx = optics.aperture_grid(spec, n_aperture=32, pad_factor=2)
+    shared_screen = optics.random_phase_screen(
+        X, Y, inside, dx, rms_rad=0.8, corr_length_m=0.04, rng=np.random.default_rng(0)
+    )
+    feed_a = (0.0, 0.0)
+    feed_b = (0.02, -0.01)
+    field_a_plain = optics.aperture_field(spec, feed_a, X, Y, inside, q=2.0)
+    field_a_shared = optics.aperture_field(
+        spec, feed_a, X, Y, inside, q=2.0, extra_phase=shared_screen
+    )
+    field_b_plain = optics.aperture_field(spec, feed_b, X, Y, inside, q=2.0)
+    field_b_shared = optics.aperture_field(
+        spec, feed_b, X, Y, inside, q=2.0, extra_phase=shared_screen
+    )
+    ratio_a = field_a_shared[inside] / field_a_plain[inside]
+    ratio_b = field_b_shared[inside] / field_b_plain[inside]
+    np.testing.assert_allclose(ratio_a, ratio_b, atol=1e-9)

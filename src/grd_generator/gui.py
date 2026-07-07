@@ -158,6 +158,10 @@ def build_reflector_result(
     zone_radius_deg: float,
     grid: UVGrid,
     defocus_m: float = 0.0,
+    phase_error_rms_rad: float = 0.0,
+    phase_corr_length_m: float = 0.05,
+    phase_error_seed: int = 0,
+    phase_error_shared_rms_rad: float = 0.0,
 ) -> ReflectorResult:
     """Construit le résultat AFR (pur, sans Qt) depuis les paramètres de l'IHM."""
     spec = ReflectorSpec(
@@ -170,6 +174,10 @@ def build_reflector_result(
         positions_m=hex_feed_positions(pitch_m, n_feeds, focal_radius_m=10.0 * pitch_m),
         q=q,
         defocus_m=defocus_m,
+        phase_error_rms_rad=phase_error_rms_rad,
+        phase_corr_length_m=phase_corr_length_m,
+        phase_error_seed=phase_error_seed,
+        phase_error_shared_rms_rad=phase_error_shared_rms_rad,
     )
     co, cross = synthesize_reflector_fields(spec, feeds, grid)
     return ReflectorResult(
@@ -397,6 +405,9 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         self._pitch = self._dspin(0.002, 0.5, 0.03, 0.001, decimals=3)
         self._n_feeds = self._ispin(1, 127, 7)
         self._defocus = self._dspin(-5.0, 5.0, 0.0, 0.1)
+        self._phase_rms = self._dspin(0.0, 3.0, 0.0, 0.05, decimals=2)
+        self._phase_shared_rms = self._dspin(0.0, 3.0, 0.0, 0.05, decimals=2)
+        self._phase_corr = self._dspin(0.005, 0.5, 0.05, 0.005, decimals=3)
         # bornes zone : [6, 14]° conforme à ServiceZone
         self._zone_radius = self._dspin(6.0, 14.0, 8.0, 0.5)
         self._feed_idx = self._ispin(0, 0, 0)
@@ -421,6 +432,9 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
         ff.addRow("Pas pitch (m)", self._pitch)
         ff.addRow("N feeds", self._n_feeds)
         ff.addRow("Defocus (m)", self._defocus)
+        ff.addRow("σ par feed (rad)", self._phase_rms)
+        ff.addRow("σ commun (rad)", self._phase_shared_rms)
+        ff.addRow("Corrélation (m)", self._phase_corr)
         zone_grp = QGroupBox("Zone de service")
         zf = QFormLayout(zone_grp)
         zf.addRow("Rayon zone (°)", self._zone_radius)
@@ -492,6 +506,9 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
                 zone_radius_deg=self._zone_radius.value(),
                 grid=grid,
                 defocus_m=self._defocus.value(),
+                phase_error_rms_rad=self._phase_rms.value(),
+                phase_corr_length_m=self._phase_corr.value(),
+                phase_error_shared_rms_rad=self._phase_shared_rms.value(),
             )
         except ValueError as exc:
             QMessageBox.warning(self, "Génération impossible", str(exc))
@@ -600,6 +617,9 @@ class ReflectorStudio(QMainWindow):  # type: ignore[misc]
             n_feeds=self._n_feeds.value(),
             zone_radius_deg=self._zone_radius.value(),
             defocus_m=self._defocus.value(),
+            phase_error_rms_rad=self._phase_rms.value(),
+            phase_corr_length_m=self._phase_corr.value(),
+            phase_error_shared_rms_rad=self._phase_shared_rms.value(),
         )
 
     def _on_export_grd(self) -> None:
@@ -676,6 +696,26 @@ faisceau <i>formé</i> vers une cible.</p>
     pattern par feed (crête plus basse, enveloppe plus large) ; le beamforming
     (filtre adapté déjà en place) refocalise et recombine partiellement
     l'énergie perdue, sans l'annuler entièrement.</td></tr>
+<tr><td><b>σ par feed (rad)</b></td>
+    <td>Écart-type de l'écran de phase aléatoire corrélé propre à chaque feed
+    (erreurs type Ruze : imperfections de surface/alignement statistiques
+    individuelles, RNG dédié par feed). Ce terme <i>disperse</i> : il dégrade
+    chaque feed de façon indépendante, donc augmente la dispersion de crête
+    d'un feed à l'autre en plus de la dégradation moyenne (crête ↓, lobes
+    secondaires ↑) — indépendamment du pitch. σ=0 (défaut) : aucun écran,
+    comportement inchangé.</td></tr>
+<tr><td><b>σ commun (rad)</b></td>
+    <td>Écart-type de l'écran de phase aléatoire corrélé COMMUN à tous les
+    feeds (erreurs de surface du réflecteur lui-même, un seul écran partagé).
+    Ce terme dégrade chaque feed de la même façon (crête ↓, lobes secondaires
+    ↑) <i>sans</i> disperser les crêtes entre feeds, contrairement au σ par
+    feed. σ=0 (défaut) : aucun écran commun.</td></tr>
+<tr><td><b>Corrélation (m)</b></td>
+    <td>Longueur de corrélation spatiale du lissage gaussien appliqué aux deux
+    bruits de phase (par feed et commun) : contrôle l'échelle du « speckle »
+    (grain fin ⇒ corrélation courte, texture plus large ⇒ corrélation
+    longue), à σ fixé.
+    Sans effet si σ=0.</td></tr>
 <tr><td><b>Rayon zone (°)</b></td>
     <td>Rayon du disque de service, tracé en cercle blanc pointillé sur toutes les
     cartes (u,v). N'agit pas sur les champs, seulement sur l'affichage.</td></tr>
