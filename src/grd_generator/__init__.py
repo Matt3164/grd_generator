@@ -1,12 +1,10 @@
 """grd_generator — génération du jeu de référence de diagrammes d'antenne (.npz)."""
 
-from grd_generator.calibrate import generate_calibrated
 from grd_generator.generate import (
     auto_spacing,
     generate_reference,
     write_reference,
 )
-from grd_generator.report_ingest import MeasuredStats, read_report
 from grd_generator.scenario import (
     FRANCE,
     SatFrameGeometry,
@@ -44,7 +42,4 @@ __all__ = [
     "auto_spacing",
     "write_reference",
     "generate_reference",
-    "MeasuredStats",
-    "read_report",
-    "generate_calibrated",
 ]

@@ -73,7 +73,6 @@ source = ["src/grd_generator"]
 branch = true
 omit = [
     "*/grd_generator/generate.py",                      # script offline : orchestration + écriture .npz
-    "*/grd_generator/calibrate.py",                     # script offline : sampling + écriture .npz + CLI
     "*/grd_generator/plot.py",                          # rendu matplotlib : effets de bord graphiques
     "*/grd_generator/gui.py",                           # application Qt : effets de bord interface
     "*/grd_generator/reflector/generate_afr.py",        # script offline AFR : orchestration + écriture .npz
