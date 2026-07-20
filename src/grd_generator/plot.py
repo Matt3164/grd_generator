@@ -13,14 +13,7 @@ from numpy.typing import NDArray
 from grd_generator.reflector.zone import ServiceZone
 from grd_generator.schemas import UVGrid
 
-_FLOOR = 1e-12  # plancher de |E|² pour éviter log10(0)
 _DYN_RANGE_DB = 40.0  # plage dynamique affichée sous la crête
-
-
-def envelope_max_dbi(fields: NDArray[np.complex128]) -> NDArray[np.float64]:
-    """Enveloppe = **max sur tous les patterns** : `10·log10(maxᵢ|Eᵢ|²)` en dBi."""
-    power = (np.abs(fields) ** 2).max(axis=0)
-    return np.asarray(10.0 * np.log10(np.maximum(power, _FLOOR)), dtype=np.float64)
 
 
 def _draw_uv_map(ax: Any, grid: UVGrid, dbi: NDArray[np.float64], title: str) -> Any:
@@ -59,9 +52,9 @@ def draw_service_zone_uv(
 ) -> None:
     """Trace le contour du disque de zone de service sur des axes (u, v).
 
-    Par défaut (`to_direction_cosine=False`, `PatternStudio`), le disque est
-    tracé tel quel : `zone.radius_deg` est un rayon angulaire en degrés, dans
-    des axes également en degrés. `to_direction_cosine=True` (`ReflectorStudio`)
+    Par défaut (`to_direction_cosine=False`), le disque est tracé tel quel :
+    `zone.radius_deg` est un rayon angulaire en degrés, dans des axes également
+    en degrés. `to_direction_cosine=True` (utilisé par `ReflectorStudio`)
     convertit ce rayon en rayon de cosinus directeur `sin(rad(radius_deg))`
     avant traçage, le centre restant inchangé : exact pour un cône de
     demi-angle constant centré à l'origine (seul cas utilisé côté reflector,
