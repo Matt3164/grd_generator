@@ -79,9 +79,13 @@ def _bilinear(
 
 
 def resample_to_uvgrid(field: ComplexArray, lin_axis: FloatArray, grid: UVGrid) -> ComplexField:
-    """Rééchantillonne le far-field (cosinus directeurs) sur la grille (u,v) en degrés."""
+    """Rééchantillonne le far-field sur la grille (u,v) — reflector only.
+
+    `grid` est déjà exprimée en cosinus directeurs (u,v) = (l,m) : pas de
+    conversion `sin` ici, contrairement à l'ancienne convention (u,v) en
+    degrés. Voir `grd_generator.plot` pour le chemin `PatternStudio`, qui
+    reste en degrés et n'utilise pas cette fonction.
+    """
     gu, gv = grid.meshgrid()
-    lq = np.sin(np.radians(gu))
-    mq = np.sin(np.radians(gv))
-    out: ComplexField = _bilinear(field, lin_axis, lq, mq).astype(np.complex128)
+    out: ComplexField = _bilinear(field, lin_axis, gu, gv).astype(np.complex128)
     return out

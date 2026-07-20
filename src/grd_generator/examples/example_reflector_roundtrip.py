@@ -43,6 +43,11 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_REFERENCE_REPORT = REPO_ROOT / "data" / "reference_reports" / "0000" / "report.json"
 DEFAULT_OUT_DIR = REPO_ROOT / "data" / "export" / "roundtrip" / "default"
 
+# Grille reflector en cosinus directeurs (u,v) = (sinθcosφ, sinθsinφ), conforme
+# GRASP IGRID=1. ±0.25 ≈ ±14° (sin(14°)=0.242) : même champ de vue que l'ancienne
+# grille en degrés.
+_UV_HALF_WIDTH = 0.25
+
 # Stats comparées entre le rapport simulé et le rapport de référence. Voir la
 # note de confidentialité en tête de module : `peak_dbi_mean` est exclu.
 COMPARED_STATS = (
@@ -70,30 +75,19 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--diameter-m", type=float, default=2.0)
     parser.add_argument("--f-over-d", type=float, default=1.2)
     parser.add_argument("--offset-m", type=float, default=0.0)
+    parser.add_argument(
+        "--centered",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Ouverture centrée sur l'axe (axisymétrique) au lieu de l'offset réel (défaut).",
+    )
     parser.add_argument("--freq-ghz", type=float, default=20.0)
     parser.add_argument("--q", type=float, default=2.0)
     parser.add_argument("--pitch-m", type=float, default=0.03)
     parser.add_argument("--n-feeds", type=int, default=7)
     parser.add_argument("--defocus-m", type=float, default=0.0)
-    parser.add_argument("--phase-rms-rad", type=float, default=0.0)
-    parser.add_argument("--phase-corr-m", type=float, default=0.05)
-    parser.add_argument("--phase-seed", type=int, default=0)
-    parser.add_argument("--phase-shared-rms-rad", type=float, default=0.0)
-    parser.add_argument("--footprint-m", type=float, default=0.0)
-    parser.add_argument("--footprint-magnification", type=float, default=0.0)
     parser.add_argument("--zone-radius-deg", type=float, default=8.0)
     parser.add_argument("--n-grid", type=int, default=81)
-    parser.add_argument(
-        "--n-aperture",
-        type=int,
-        default=128,
-        help="échantillons sur le diamètre d'ouverture (défaut synth_afr inchangé) ;"
-        " augmenter avec un grand diamètre et une petite corrélation/empreinte"
-        " pour respecter dx <= corr/3 et dx <= footprint/20",
-    )
-    parser.add_argument(
-        "--pad-factor", type=int, default=4, help="facteur de zéro-padding (défaut inchangé)"
-    )
     parser.add_argument(
         "--reference-report",
         type=Path,
@@ -118,7 +112,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def generate_and_export_grd(args: argparse.Namespace, grd_dir: Path) -> int:
     """Génère les champs AFR et écrit un `.grd` (co+cross) par feed dans `grd_dir`."""
     grid = UVGrid(
-        u_min=-14.0, u_max=14.0, v_min=-14.0, v_max=14.0, n_u=args.n_grid, n_v=args.n_grid
+        u_min=-_UV_HALF_WIDTH, u_max=_UV_HALF_WIDTH,
+        v_min=-_UV_HALF_WIDTH, v_max=_UV_HALF_WIDTH,
+        n_u=args.n_grid, n_v=args.n_grid,
     )
     result = build_reflector_result(
         diameter_m=args.diameter_m,
@@ -131,14 +127,7 @@ def generate_and_export_grd(args: argparse.Namespace, grd_dir: Path) -> int:
         zone_radius_deg=args.zone_radius_deg,
         grid=grid,
         defocus_m=args.defocus_m,
-        phase_error_rms_rad=args.phase_rms_rad,
-        phase_corr_length_m=args.phase_corr_m,
-        phase_error_seed=args.phase_seed,
-        phase_error_shared_rms_rad=args.phase_shared_rms_rad,
-        footprint_m=args.footprint_m,
-        footprint_magnification=args.footprint_magnification,
-        n_aperture=args.n_aperture,
-        pad_factor=args.pad_factor,
+        centered_aperture=args.centered,
     )
     grd_dir.mkdir(parents=True, exist_ok=True)
     freq_hz = args.freq_ghz * 1e9

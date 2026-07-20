@@ -18,6 +18,7 @@ Usage :
 
 import argparse
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -296,9 +297,30 @@ def draw_earth_envelope_contours(
     ax.set_title(f"Enveloppe sur Terre — isolignes ({int(step_db)} dB)")
 
 
-def draw_service_zone_uv(ax: Any, zone: ServiceZone, *, color: str = "w", lw: float = 1.5) -> None:
-    """Trace le contour du disque de zone de service sur des axes (u, v)."""
+def draw_service_zone_uv(
+    ax: Any,
+    zone: ServiceZone,
+    *,
+    color: str = "w",
+    lw: float = 1.5,
+    to_direction_cosine: bool = False,
+) -> None:
+    """Trace le contour du disque de zone de service sur des axes (u, v).
+
+    Par défaut (`to_direction_cosine=False`, `PatternStudio`), le disque est
+    tracé tel quel : `zone.radius_deg` est un rayon angulaire en degrés, dans
+    des axes également en degrés. `to_direction_cosine=True` (`ReflectorStudio`)
+    convertit ce rayon en rayon de cosinus directeur `sin(rad(radius_deg))`
+    avant traçage, le centre restant inchangé : exact pour un cône de
+    demi-angle constant centré à l'origine (seul cas utilisé côté reflector,
+    `center_uv` y valant toujours `(0.0, 0.0)`).
+    """
     u, v = zone.boundary_uv()
+    if to_direction_cosine:
+        cu, cv = zone.center_uv
+        scale = math.sin(math.radians(zone.radius_deg)) / zone.radius_deg
+        u = cu + (u - cu) * scale
+        v = cv + (v - cv) * scale
     ax.plot(u, v, color=color, lw=lw, ls="--", label="zone de service")
 
 

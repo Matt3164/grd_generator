@@ -5,12 +5,14 @@ Format `.grd` (un jeu de champ par fichier) : bloc d'en-tête texte libre, sépa
 (NX, NY, KLIMIT), et NX·NY lignes `Re(co) Im(co) Re(cross) Im(cross)`.
 
 Conventions retenues : ICOMP=3 (co/cross Ludwig-3), NCOMP=2, IGRID=1 (grille en
-cosinus directeurs u=sinθcosφ, v=sinθsinφ) — les bornes sont donc `sin(rad(u,v))`.
+cosinus directeurs u=sinθcosφ, v=sinθsinφ) — la grille `UVGrid` du reflector est
+déjà exprimée en cosinus directeurs, donc les bornes XS/YS/XE/YE sont les valeurs
+d'axe telles quelles (pas de `sin` ici : elle a déjà été appliquée en amont, lors
+du rééchantillonnage du far-field sur la grille).
 Les champs sont ceux stockés par la synthèse : amplitude normalisée en directivité.
 """
 
 import io
-import math
 import zipfile
 from typing import Any
 
@@ -27,10 +29,10 @@ def pattern_to_grd(
 ) -> str:
     """Sérialise un pattern (co + cross) au format TICRA GRASP `.grd` ASCII."""
     u_axis, v_axis = grid.axes()
-    xs = math.sin(math.radians(float(u_axis[0])))
-    ys = math.sin(math.radians(float(v_axis[0])))
-    xe = math.sin(math.radians(float(u_axis[-1])))
-    ye = math.sin(math.radians(float(v_axis[-1])))
+    xs = float(u_axis[0])
+    ys = float(v_axis[0])
+    xe = float(u_axis[-1])
+    ye = float(v_axis[-1])
     nx, ny = grid.n_u, grid.n_v
 
     lines = [
@@ -79,12 +81,7 @@ def simulation_params_dict(
     n_feeds: int,
     zone_radius_deg: float,
     defocus_m: float = 0.0,
-    phase_error_rms_rad: float = 0.0,
-    phase_corr_length_m: float = 0.05,
-    phase_error_seed: int = 0,
-    phase_error_shared_rms_rad: float = 0.0,
-    footprint_m: float = 0.0,
-    footprint_magnification: float = 0.0,
+    centered_aperture: bool = False,
 ) -> dict[str, Any]:
     """Dict sérialisable JSON des paramètres de simulation (focale dérivée incluse)."""
     return {
@@ -98,10 +95,5 @@ def simulation_params_dict(
         "n_feeds": n_feeds,
         "zone_radius_deg": zone_radius_deg,
         "defocus_m": defocus_m,
-        "phase_error_rms_rad": phase_error_rms_rad,
-        "phase_corr_length_m": phase_corr_length_m,
-        "phase_error_seed": phase_error_seed,
-        "phase_error_shared_rms_rad": phase_error_shared_rms_rad,
-        "footprint_m": footprint_m,
-        "footprint_magnification": footprint_magnification,
+        "centered_aperture": centered_aperture,
     }

@@ -13,6 +13,13 @@ class ReflectorSpec(BaseModel):
     offset_clearance_m: float = Field(0.0, ge=0)
     freq_hz: float = Field(..., gt=0)
     beam_deviation_factor: float = Field(1.0, gt=0)
+    centered_aperture: bool = Field(
+        False,
+        description=(
+            "Ouverture centrée sur l'axe (réflecteur front-fed axisymétrique) : "
+            "patterns radiaux symétriques. Quand True, `offset_clearance_m` est ignoré."
+        ),
+    )
 
     @property
     def wavelength_m(self) -> float:
@@ -24,7 +31,13 @@ class ReflectorSpec(BaseModel):
 
     @property
     def aperture_center_y_m(self) -> float:
-        """Décalage du centre de l'ouverture projetée par rapport à l'axe."""
+        """Décalage du centre de l'ouverture projetée par rapport à l'axe.
+
+        `0.0` si `centered_aperture` (ouverture axisymétrique, front-fed) ;
+        sinon `offset_clearance_m + diameter_m/2` (ouverture offset réelle).
+        """
+        if self.centered_aperture:
+            return 0.0
         return self.offset_clearance_m + self.diameter_m / 2.0
 
 
@@ -36,29 +49,6 @@ class FeedSpec(BaseModel):
     # Déplacement axial du plan des feeds (m), le long de l'axe focal
     # (>0 = feed reculé, éloigné du réflecteur). Pas de contrainte de signe.
     defocus_m: float = Field(0.0)
-    # Écran de phase aléatoire corrélé par feed (erreurs type Ruze), voir
-    # `optics.random_phase_screen`. rms=0 -> pas d'écran (comportement inchangé).
-    phase_error_rms_rad: float = Field(0.0, ge=0.0)
-    phase_corr_length_m: float = Field(0.05, gt=0.0)
-    phase_error_seed: int = Field(0)
-    # Écran de phase aléatoire corrélé COMMUN à tous les feeds (erreurs de
-    # surface du réflecteur, par opposition aux erreurs propres au feed
-    # ci-dessus) : même longueur de corrélation `phase_corr_length_m`,
-    # construit une seule fois (voir `synth_afr._SHARED_SEED_OFFSET` pour le
-    # RNG dédié, distinct de tous les seeds par-feed `phase_error_seed + i`,
-    # i >= 0) et ajouté à l'écran de chaque feed. rms=0 -> pas d'écran commun.
-    phase_error_shared_rms_rad: float = Field(0.0, ge=0.0)
-    # Modèle deux échelles : le réflecteur (`diameter_m`) redevient un vrai
-    # disque physique ; chaque feed n'en illumine qu'une empreinte gaussienne
-    # mobile (voir `optics.footprint_amplitude_mask`). Diamètre FWHM (en
-    # amplitude) de cette empreinte, en m. 0 = désactivé (pleine ouverture,
-    # comportement actuel strictement inchangé).
-    footprint_m: float = Field(0.0, ge=0.0)
-    # Déplacement du centre de l'empreinte par mètre de décalage transverse
-    # du feed (m/m, signe libre) : centre_i = (0, aperture_center_y_m) +
-    # magnification·(δx_i, δy_i). 0 = empreinte centrée pour tous les feeds
-    # (pas de balayage). Sans effet si `footprint_m == 0`.
-    footprint_magnification: float = Field(0.0)
 
     @property
     def n_feeds(self) -> int:
