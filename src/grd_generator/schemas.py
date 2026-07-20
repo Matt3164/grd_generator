@@ -37,35 +37,8 @@ class UVGrid(BaseModel):
         return gu, gv
 
 
-class GaussianSpec(BaseModel):
-    """Paramètres synthétiques d'un élément (entrée du générateur)."""
-
-    center_uv: tuple[float, float]
-    sigma: float = Field(..., gt=0)
-    peak_gain_dbi: float
-    phase_slope_radial: float = 0.0
-
-
-class EllipticalSpec(BaseModel):
-    """Paramètres d'un élément à lobe elliptique (calibration depuis données réelles).
-
-    `sigma_major`/`sigma_minor` sont les demi-largeurs le long des axes propres ;
-    `orientation_deg` est l'angle de l'axe majeur. Réduction au cas circulaire
-    quand `sigma_major == sigma_minor`.
-    """
-
-    center_uv: tuple[float, float]
-    sigma_major: float = Field(..., gt=0)
-    sigma_minor: float = Field(..., gt=0)
-    orientation_deg: float = 0.0
-    peak_gain_dbi: float
-    phase_slope_radial: float = 0.0
-
-
 __all__ = [
     "ComplexField",
     "DirectivityMap",
     "UVGrid",
-    "GaussianSpec",
-    "EllipticalSpec",
 ]
