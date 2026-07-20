@@ -1,7 +1,7 @@
 [project]
 name = "grd_generator"
 version = "0.1.0"
-description = "Générateur autonome du jeu de référence de diagrammes de rayonnement d'antenne (.npz)."
+description = "Générateur autonome de diagrammes de rayonnement par simulation de réflecteur alimenté par réseau (AFR, .npz)."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -13,7 +13,7 @@ dependencies = [
 [project.optional-dependencies]
 viz = [
     "matplotlib>=3.9",  # rendu des diagrammes (script plot.py, extra optionnel)
-    "pyqt6>=6.7",  # backend QtAgg → fenêtre native pour grd-plot (auto-sélectionné si DISPLAY)
+    "pyqt6>=6.7",  # backend QtAgg → fenêtre native pour grd-gui (auto-sélectionné si DISPLAY)
 ]
 
 [dependency-groups]
@@ -25,11 +25,8 @@ dev = [
 ]
 
 [project.scripts]
-grd-generate = "grd_generator.generate:main"
-grd-calibrate = "grd_generator.calibrate:main"
-grd-plot = "grd_generator.plot:main"
+grd-generate = "grd_generator.reflector.generate_afr:main"
 grd-gui = "grd_generator.gui:main"
-grd-generate-afr = "grd_generator.reflector.generate_afr:main"
 
 [build-system]
 requires = ["hatchling"]
