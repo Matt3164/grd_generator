@@ -183,8 +183,9 @@ def compare_reports(sim_report: dict[str, Any], ref_report: dict[str, Any]) -> d
     for stat in COMPARED_STATS:
         sim_val = sim_report.get(stat)
         ref_val = ref_report.get(stat)
-        both_numeric = isinstance(sim_val, (int, float)) and isinstance(ref_val, (int, float))
-        delta = sim_val - ref_val if both_numeric else None
+        delta: float | None = None
+        if isinstance(sim_val, (int, float)) and isinstance(ref_val, (int, float)):
+            delta = sim_val - ref_val
         comparison[stat] = {"sim": sim_val, "ref": ref_val, "delta": delta}
         logger.info("stat_compare", stat=stat, sim=sim_val, ref=ref_val, delta=delta)
     return comparison

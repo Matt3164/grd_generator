@@ -1,4 +1,4 @@
-"""Générateur offline AFR → .npz (script). Couverture exclue comme generate.py."""
+"""Générateur offline AFR → .npz (script). Couverture exclue : orchestration + I/O."""
 
 from pathlib import Path
 from typing import Any

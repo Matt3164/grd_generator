@@ -11,10 +11,9 @@ DirectivityMap = NDArray[np.float64]  # directivité en dBi sur la grille
 class UVGrid(BaseModel):
     """Maillage angulaire régulier (u, v) vu du satellite.
 
-    Unité selon le chemin : `PatternStudio` (calibration) reste en degrés ;
-    `ReflectorStudio` (AFR) est en cosinus directeurs (u,v) = (sinθcosφ,
-    sinθsinφ), conforme GRASP IGRID=1. `UVGrid` lui-même est agnostique de
-    l'unité — c'est un maillage régulier générique.
+    `ReflectorStudio` (AFR) l'exprime en cosinus directeurs (u,v) =
+    (sinθcosφ, sinθsinφ), conforme GRASP IGRID=1. `UVGrid` lui-même est
+    agnostique de l'unité — c'est un maillage régulier générique.
     """
 
     u_min: float
@@ -37,35 +36,8 @@ class UVGrid(BaseModel):
         return gu, gv
 
 
-class GaussianSpec(BaseModel):
-    """Paramètres synthétiques d'un élément (entrée du générateur)."""
-
-    center_uv: tuple[float, float]
-    sigma: float = Field(..., gt=0)
-    peak_gain_dbi: float
-    phase_slope_radial: float = 0.0
-
-
-class EllipticalSpec(BaseModel):
-    """Paramètres d'un élément à lobe elliptique (calibration depuis données réelles).
-
-    `sigma_major`/`sigma_minor` sont les demi-largeurs le long des axes propres ;
-    `orientation_deg` est l'angle de l'axe majeur. Réduction au cas circulaire
-    quand `sigma_major == sigma_minor`.
-    """
-
-    center_uv: tuple[float, float]
-    sigma_major: float = Field(..., gt=0)
-    sigma_minor: float = Field(..., gt=0)
-    orientation_deg: float = 0.0
-    peak_gain_dbi: float
-    phase_slope_radial: float = 0.0
-
-
 __all__ = [
     "ComplexField",
     "DirectivityMap",
     "UVGrid",
-    "GaussianSpec",
-    "EllipticalSpec",
 ]

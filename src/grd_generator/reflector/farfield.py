@@ -83,8 +83,7 @@ def resample_to_uvgrid(field: ComplexArray, lin_axis: FloatArray, grid: UVGrid) 
 
     `grid` est déjà exprimée en cosinus directeurs (u,v) = (l,m) : pas de
     conversion `sin` ici, contrairement à l'ancienne convention (u,v) en
-    degrés. Voir `grd_generator.plot` pour le chemin `PatternStudio`, qui
-    reste en degrés et n'utilise pas cette fonction.
+    degrés.
     """
     gu, gv = grid.meshgrid()
     out: ComplexField = _bilinear(field, lin_axis, gu, gv).astype(np.complex128)
