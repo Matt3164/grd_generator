@@ -8,6 +8,7 @@ dependencies = [
     "numpy>=2.0",
     "pydantic>=2.7",
     "loguru>=0.7",
+    "h5py>=3.16.0",
 ]
 
 [project.optional-dependencies]
@@ -27,6 +28,7 @@ dev = [
 [project.scripts]
 grd-generate = "grd_generator.reflector.generate_afr:main"
 grd-gui = "grd_generator.gui:main"
+grd-batch = "grd_generator.reflector.batch:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -51,6 +53,11 @@ plugins = ["pydantic.mypy"]
 # est vérifié au mieux sans typage de la lib graphique.
 [[tool.mypy.overrides]]
 module = ["matplotlib.*"]
+ignore_missing_imports = true
+
+# h5py n'a pas de marqueur py.typed complet : ignoré comme matplotlib ci-dessus.
+[[tool.mypy.overrides]]
+module = ["h5py.*"]
 ignore_missing_imports = true
 
 # PyQt6 : subclassing QMainWindow (Any sans stubs complets) toléré dans gui.py seul.
