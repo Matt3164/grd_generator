@@ -1,0 +1,172 @@
+# Design — Lot multi-fréquence en bande Ku, export HDF5 (structure TICRA Tools 25.0)
+
+Date : 2026-09-17 · Branche : `feat/batch-ku-hdf5`
+
+## Objectif
+
+Produire, **sans interface graphique et de façon rejouable**, un jeu de diagrammes élémentaires
+d'antenne réseau à réflecteur : bande Ku, une famille de fichiers par fréquence, deux polarisations,
+conteneur **HDF5** de même structure que les grilles sphériques `uv` écrites par TICRA Tools 25.0,
+un fichier par (feed, fréquence, polarisation). Les diagrammes sont **centrés au nadir**.
+
+Jusqu'ici l'export `.grd` ne passait que par la fenêtre `grd-gui` : aucune trace de la commande ni
+des paramètres ne subsistait à côté des fichiers produits. La configuration du lot devient la
+provenance du jeu.
+
+Hors périmètre : `grd-gui`, `grd-generate`, le format `.npz`, l'export ASCII existant (inchangés) ;
+aucune modification de la physique (`optics`, `farfield`, `synth_afr.synthesize_reflector_fields`).
+
+## Décisions
+
+- **Format HDF5**, structure décrite ci-dessous.
+- **Polarisation V par échange de composantes** : une seule excitation est simulée (feed polarisé
+  x, inchangé) ; le fichier V est **fabriqué** à partir du fichier H en échangeant les deux
+  composantes de champ. Aucune excitation y n'est ajoutée à `optics.aperture_pol_vectors`.
+- **Diagrammes centrés au nadir** (amas de lobes centré sur (u, v) = (0, 0)).
+- **Liste de fréquences libre** (paramètre) ; jeu de référence : 30 fréquences de 10 700 à
+  12 750 MHz, soit 91 × 30 × 2 = 5 460 fichiers, ≈ 4,4 Go (≈ 0,83 Mo par fichier).
+- **Paramètres physiques inchangés d'une fréquence à l'autre** (voir « Mesure »).
+
+## Plages cibles et critère bloquant
+
+« Enveloppe » = Σ sur les feeds de |co-pol|² en un point : majorant de la directivité atteignable
+par formation de faisceau (exact si les lobes étaient orthogonaux ; elle la **surestime** quand ils
+se recouvrent, et peut dépasser la limite d'ouverture (πD/λ)²).
+
+| grandeur | plage cible | nature |
+|---|---|---|
+| crête co-polaire médiane par feed | 27 – 28,5 dBi | informatif |
+| largeur médiane à −3 dB par feed (diamètre équivalent) | 6 – 7,5° | informatif |
+| rayon maximal des crêtes autour du nadir | ≤ 6,2° | informatif |
+| maximum de l'enveloppe | 42 – 44,5 dBi | informatif |
+| rayon, autour du nadir, où l'enveloppe reste à moins de 3 dB de son maximum | **≥ 4,0° à chaque fréquence** | **bloquant** (`--check`) |
+| rayon où l'enveloppe ≥ 39 dBi | ≥ 4,0° | informatif |
+| grille | 161 × 161, u et v ∈ ±0,18 (± 10,4°, couvre le disque Terre vu d'une orbite géostationnaire, 8,7°) | — |
+
+## Mesure : seule la fréquence change
+
+Réflecteur 1,3 m, F/D 1,5, ouverture centrée, 91 feeds au pas de 32 mm, `q` 2, défocalisation
+0,53 m — paramètres identiques à toutes les fréquences :
+
+| fréquence (MHz) | crête médiane (dBi) | largeur −3 dB (°) | maximum de l'enveloppe (dBi) | rayon enveloppe −3 dB (°) |
+|---|---|---|---|---|
+| 10 700 | 30,04 | 6,34 | 46,52 | 4,16 |
+| 11 000 | 29,81 | 6,35 | 46,54 | 4,13 |
+| 11 400 | 29,43 | 6,42 | 46,54 | 4,21 |
+| 11 900 | 29,63 | 6,26 | 46,52 | 4,22 |
+| 12 750 | 29,99 | 6,91 | 46,54 | 4,30 |
+
+Des lobes aussi défocalisés sont quasi indépendants de la fréquence dans ce modèle : le critère
+bloquant est tenu sur toute la bande sans re-réglage. Augmenter `defocus_m` dégrade (largeur 1,3° à
+0,75 m) ; aucune combinaison du balayage (`defocus_m`, `pitch_m`, `q`, `n_feeds`) ne fait mieux sur
+le critère bloquant. Les niveaux (crête, maximum de l'enveloppe) sortent des plages informatives par
+le haut : assumé.
+
+## Conteneur HDF5
+
+| objet | contenu |
+|---|---|
+| `/data` | `complex128`, forme `(1, 1, n_v, n_u, 2)` = (fréquence, faisceau, v, u, composante), contigu, non compressé |
+| `/parameterlist` | chaînes `['frequency', 'beams', 'v', 'u', 'polarisation']` |
+| `/parameters/frequency` | `float64 (1,)`, **en GHz**, attribut `unit = 'GHz'` |
+| `/parameters/beams` | chaînes `['']`, attribut `num_named_beams = 0` |
+| `/parameters/u`, `/parameters/v` | `float64 (n,)`, cosinus directeurs, attribut `unit = ''` |
+| `/parameters/polarisation` | chaînes `['E_Lx', 'E_Ly']`, attribut `unit = ['N/A', 'N/A']` |
+| `/object` (attributs) | `class='spherical_grid'`, `grid_type='uv'`, `igrid=1`, `ncomp=2`, `icomp=-3`, `polarisation='linear'`, `field_region='far'`, `field_type='E field'`, `field_distance=inf`, `truncation='rectangular'`, `beam_centres=[[0,0]]`, `name='FarField_<set>_HComb'` ou `'…_VComb'` |
+| `/tt_display_hints` (attributs) | `type='Grid:Spherical'`, `x_axis='u'`, `y_axis='v'`, `data_parameter='polarisation'`, `db_factor=20.0` |
+| `/info` (attributs) | `version=2`, `timestamp`, `comment` |
+
+- `icomp = -3` par défaut (convention d'écriture HDF5 de ce format pour « linéaire co/cx, Ludwig 3 ») ;
+  paramètre `hdf5.icomp` pour écrire `3`.
+- **Provenance honnête** : `/info@comment = 'SYNTHETIQUE - grd_generator <version>, structure TICRA
+  Tools 25.0'`, `/info@timestamp = 'Generated by grd_generator <version> on <date>'` ; les attributs
+  propres au producteur d'origine (`licensee`, `serial_number`) ne sont pas écrits.
+- La date vient de la configuration (`generated_on`), pas de l'horloge ; `track_times=False` sur
+  chaque dataset et `libver='earliest'` : deux exécutions donnent des fichiers **identiques octet
+  pour octet**.
+- Sens des axes : le générateur n'a aucune notion géographique ; u et v sont des cosinus directeurs.
+  Convention du consommateur visé : u positif vers l'Est, v positif vers le Sud. Un amas hexagonal
+  centré devant une ouverture axisymétrique est symétrique par v → −v.
+
+### Polarisations (base fixe)
+
+Les deux fichiers d'un feed sont exprimés dans la même base fixe (`E_Lx`, `E_Ly`) :
+
+- fichier **H** : `data[..., 0] = co` (composante Ludwig-3 selon x), `data[..., 1] = cross` — les
+  champs rendus par `synthesize_reflector_fields`, sans retouche ;
+- fichier **V** : `data[..., 0] = cross_H`, `data[..., 1] = co_H` (échange exact).
+
+Le jeu livre un `NOTICE.md` : V n'est jamais une excitation simulée, rien à conclure sur la
+polarisation croisée réelle de la voie V.
+
+## Commande `grd-batch`
+
+```bash
+uv run grd-batch --config batch-ku.json --out <dossier> [--check]
+```
+
+Configuration (`BatchConfig`, pydantic ; les champs additionnels, p. ex. un bloc `_provenance`, sont
+tolérés et recopiés) :
+
+```json
+{
+  "set_id": "gen-ku-91f",
+  "generated_on": "2026-09-17",
+  "reflector": {"diameter_m": 1.3, "f_over_d": 1.5, "offset_clearance_m": 0.2, "centered_aperture": true},
+  "feeds": {"n_feeds": 91, "pitch_m": 0.032, "q": 2.0, "defocus_m": 0.53},
+  "frequencies_mhz": [10700, 11400, 12750],
+  "grid": {"u_min": -0.18, "u_max": 0.18, "v_min": -0.18, "v_max": 0.18, "n_u": 161, "n_v": 161},
+  "sampling": {"n_aperture": 128, "pad_factor": 8},
+  "polarizations": {"H": "simulated", "V": "swap_of_H"},
+  "hdf5": {"icomp": -3},
+  "name_pattern": "Tx_{feed:04d}_{freq_mhz:d}_{pol}P.grd"
+}
+```
+
+`pad_factor` 8 : le pas du champ lointain vaut λ/(pad·D) ≈ 0,0025 à 11,4 GHz, du même ordre que le
+pas de grille 0,00225.
+
+Sortie, à plat :
+
+```
+<dossier>/
+  grd/Tx_0001_10700_HP.grd …          # feeds numérotés à partir de 1
+  meta/batch-config.json              # copie exacte de la configuration
+  meta/sim_params.json                # paramètres de simulation par fréquence
+  meta/metrics.json                   # métriques mesurées sur les champs écrits
+  meta/NOTICE.md                      # V synthétique
+  MANIFEST.sha256
+```
+
+Échec (code 1) sans rien écrire si la configuration est invalide ou si le dossier de sortie existe et
+n'est pas vide ; `--check` : code 1 si le critère bloquant n'est pas tenu à une fréquence (le jeu est
+écrit dans tous les cas) ; logs `loguru` structurés (`batch_start`, `frequency_done`, `batch_done`) ;
+export de données intermédiaires sous `DEBUG_EXPORT=true`. Coût mesuré : ≈ 25 s par fréquence
+(91 feeds, 128/8), ≈ 13 min pour 30 fréquences.
+
+## Métriques et exemple
+
+`reflector/metrics.py` (pur, sans E/S) : crête et largeur à −3 dB par feed, position des crêtes,
+enveloppe, maximum, rayons à −1/−3 dB et ≥ 39 dBi autour du nadir.
+`examples/example_batch_ku.py` : balayage de paramètres à une fréquence (tableau des métriques) et
+figure (`--figure`, surimpression optionnelle des centres de faisceaux d'un plan de mission,
+`--mission-plan`) ; tracé dans `plot.py` (extra `viz`).
+
+## Tests (TDD, 100 % de couverture)
+
+Structure HDF5 relue clé par clé ; ordre des axes de `/data` vérifié avec un champ asymétrique ;
+échange H/V exact ; nommage ; refus nommés de `BatchConfig` ; reproductibilité octet pour octet ;
+métriques exactes sur champs gaussiens synthétiques ; non-régression de l'export ASCII ; test de
+lancement de l'exemple (grille réduite, plan de mission synthétique).
+
+## Dépendance
+
+`h5py` (`uv add h5py`, puis `uv sync --extra viz` pour conserver matplotlib/PyQt6).
+
+## Lots
+
+| lot | contenu |
+|---|---|
+| B1 | `reflector/hdf5_export.py` + dépendance `h5py` |
+| B2 | `BatchConfig`, `reflector/batch.py`, entrée `grd-batch`, arborescence de sortie, manifeste, NOTICE |
+| B3 | `reflector/metrics.py`, `--check`, `examples/example_batch_ku.py`, tracé, README |
